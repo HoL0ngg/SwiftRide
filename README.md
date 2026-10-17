@@ -93,3 +93,7 @@ dotnet run --project src/TripService/Api/SwiftRide.TripService.Api.csproj
 Matching cần `ConnectionStrings__MatchDB` và `MongoDB__Database`; Payment cần `ConnectionStrings__PaymentDB`. Gateway cần `Jwt__Issuer`, `Jwt__Audience`, `Jwt__SigningKey`, `RateLimit__PermitLimit`, `RateLimit__WindowSeconds`, `RateLimit__QueueLimit` và hai destination address như trong Compose. Không đưa connection string thật vào tài liệu.
 
 Bước tiếp theo: triển khai MVP bắt đầu từ Trip Domain và test chuyển trạng thái theo AGENTS.md.
+
+## Giao diện rider và driver
+
+`src/WebApp` có hai giao diện Swift Emerald, dùng Vite + React + TypeScript + Tailwind CSS. Bản đồ tải thật từ OpenStreetMap; API, chuyến đi và thanh toán đang mô phỏng trong trình duyệt, chưa kết nối backend. Có thể mở hai tab để trải nghiệm chung một chuyến từ đặt xe đến thanh toán. Xem cách chạy, giới hạn và kịch bản thử tại [docs/frontend-demo.md](docs/frontend-demo.md).
