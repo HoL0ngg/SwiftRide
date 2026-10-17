@@ -14,6 +14,7 @@ src/
   MatchingService/             # Domain, Application, Infrastructure, Api
   PaymentService/              # Domain, Application, Infrastructure, Api
 tests/
+  SwiftRide.Api.Tests/
   SwiftRide.TripService.Tests/
   SwiftRide.MatchingService.Tests/
   SwiftRide.PaymentService.Tests/
@@ -37,6 +38,20 @@ dotnet test SwiftRide.sln
 
 Mỗi service có một test placeholder `Skeleton_Compiles`; phải xóa khi có test thật. Runner xUnit được giữ theo sự cho phép của người dùng.
 
+`tests/SwiftRide.Api.Tests` kiểm tra exception handler của cả bốn ứng dụng qua HTTP trong Development và Production, gồm mã lỗi, định dạng JSON và việc ẩn dữ liệu nhạy cảm.
+
+## Xử lý exception
+
+Mỗi service và Gateway có `GlobalExceptionHandler` riêng tại tầng API, dùng `IExceptionHandler` có sẵn của ASP.NET Core. `Program.cs` đăng ký `AddProblemDetails`, `AddExceptionHandler` và đặt `UseExceptionHandler` trước các middleware/endpoint còn lại.
+
+- `BadHttpRequestException` có mã 4xx giữ nguyên mã HTTP (ví dụ 400 hoặc 413).
+- Exception khác trả 500 với thông báo chung; không gửi exception message hoặc stack trace cho client, kể cả Development.
+- Response có content type `application/problem+json`, các trường `type`, `title`, `status`, `detail`, `traceId`. Log chỉ ghi mã lỗi, tên kiểu exception và `traceId`, tránh lộ token/connection string qua exception message.
+
+Handler chỉ xử lý exception trong HTTP pipeline khi response chưa bắt đầu; không xử lý lỗi cấu hình lúc startup hay lỗi background worker. Các response 401/403/404/429/501 hiện có giữ nguyên hành vi. Chưa có domain exception nên chưa tự ánh xạ lỗi nghiệp vụ thành 404/409; thêm ánh xạ theo kiểu exception cụ thể khi triển khai use case. Lỗi kết nối upstream do YARP chuyển thành response 502/504 không phải exception thoát ra pipeline.
+
+Tham khảo: [xử lý lỗi ASP.NET Core 10](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/error-handling?view=aspnetcore-10.0).
+
 ## Chạy bằng Docker Compose
 
 Cần Docker daemon đang chạy. Tạo cấu hình local rồi thay tất cả password/signing key mẫu:
@@ -52,6 +67,8 @@ docker compose down
 `.env` được git-ignore; không đưa secrets vào Git. Khi đổi thông tin đăng nhập, database volume đã tồn tại không tự cập nhật password. MongoDB credentials trong connection URI cần URL-encode ký tự đặc biệt.
 
 Gateway ở `http://localhost:5080`; chỉ gateway publish port. Các service nghe cổng 8080 trong network Compose; mỗi service chỉ phụ thuộc database riêng. Health endpoint của gateway và service là liveness, chưa kiểm tra kết nối database.
+
+Bốn Dockerfile dùng build nhiều giai đoạn và chạy ứng dụng bằng user không phải root (`APP_UID`). Compose dùng sẵn DNS `trip-service:8080` và `matching-service:8080`; chỉ cần đặt các biến địa chỉ khi muốn ghi đè. `ASPNETCORE_ENVIRONMENT` được truyền cho cả Gateway và ba service. Dữ liệu được lưu trong ba named volume; `docker compose down` giữ dữ liệu, tránh dùng `down -v` nếu cần giữ database.
 
 `ASPNETCORE_ENVIRONMENT=Development` mới đăng ký `POST /dev/token?userId=example&role=rider` (hoặc `driver`). Response chứa `access_token`; gửi bằng header `Authorization: Bearer <token>`. Token hết hạn sau 30 phút. Production không có endpoint này; kiểm tra bằng `docs/check-skeleton.ps1 -Production`.
 

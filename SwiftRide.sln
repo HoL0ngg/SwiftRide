@@ -73,6 +73,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwiftRide.PaymentService.Te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwiftRide.TripService.Tests", "tests\SwiftRide.TripService.Tests\SwiftRide.TripService.Tests.csproj", "{BEBCE95A-4464-4F0E-9B28-236106E1BCCB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SwiftRide.Api.Tests", "tests\SwiftRide.Api.Tests\SwiftRide.Api.Tests.csproj", "{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -287,6 +289,18 @@ Global
 		{BEBCE95A-4464-4F0E-9B28-236106E1BCCB}.Release|x64.Build.0 = Release|Any CPU
 		{BEBCE95A-4464-4F0E-9B28-236106E1BCCB}.Release|x86.ActiveCfg = Release|Any CPU
 		{BEBCE95A-4464-4F0E-9B28-236106E1BCCB}.Release|x86.Build.0 = Release|Any CPU
+		{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C}.Debug|x64.Build.0 = Debug|Any CPU
+		{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C}.Debug|x86.Build.0 = Debug|Any CPU
+		{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C}.Release|x64.ActiveCfg = Release|Any CPU
+		{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C}.Release|x64.Build.0 = Release|Any CPU
+		{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C}.Release|x86.ActiveCfg = Release|Any CPU
+		{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -325,5 +339,6 @@ Global
 		{02A211B8-3B63-4399-9445-55B004A2C969} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{B9A22265-0480-4D6C-8B94-02832CFA3BE7} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{BEBCE95A-4464-4F0E-9B28-236106E1BCCB} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{F494186F-BD31-4D16-9CFE-6B8AAFDB6E9C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

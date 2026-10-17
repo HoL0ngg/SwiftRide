@@ -10,8 +10,8 @@ services:
       Jwt__Issuer: ${JWT_ISSUER:?Set JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE:?Set JWT_AUDIENCE}
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY}
-      ReverseProxy__Clusters__trip-service__Destinations__primary__Address: ${TRIP_SERVICE_ADDRESS:?Set TRIP_SERVICE_ADDRESS}
-      ReverseProxy__Clusters__matching-service__Destinations__primary__Address: ${MATCHING_SERVICE_ADDRESS:?Set MATCHING_SERVICE_ADDRESS}
+      ReverseProxy__Clusters__trip-service__Destinations__primary__Address: ${TRIP_SERVICE_ADDRESS:-http://trip-service:8080/}
+      ReverseProxy__Clusters__matching-service__Destinations__primary__Address: ${MATCHING_SERVICE_ADDRESS:-http://matching-service:8080/}
       RateLimit__PermitLimit: ${RATE_LIMIT_PERMIT_LIMIT:-100}
       RateLimit__WindowSeconds: ${RATE_LIMIT_WINDOW_SECONDS:-60}
       RateLimit__QueueLimit: ${RATE_LIMIT_QUEUE_LIMIT:-0}
@@ -21,6 +21,7 @@ services:
       context: .
       dockerfile: src/TripService/Api/Dockerfile
     environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ConnectionStrings__TripDB: "Server=sqlserver;Database=TripDB;User Id=sa;Password=${SQLSERVER_PASSWORD:?Set SQLSERVER_PASSWORD};TrustServerCertificate=True;Connect Timeout=30"
     depends_on:
       sqlserver:
@@ -31,6 +32,7 @@ services:
       context: .
       dockerfile: src/MatchingService/Api/Dockerfile
     environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       # URL-encode special characters in MongoDB credentials used in the URI.
       ConnectionStrings__MatchDB: "mongodb://${MONGO_USERNAME:?Set MONGO_USERNAME}:${MONGO_PASSWORD:?Set MONGO_PASSWORD}@mongodb:27017/MatchDB?authSource=admin&connectTimeoutMS=30000&serverSelectionTimeoutMS=30000&socketTimeoutMS=30000"
       MongoDB__Database: MatchDB
@@ -43,6 +45,7 @@ services:
       context: .
       dockerfile: src/PaymentService/Api/Dockerfile
     environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ConnectionStrings__PaymentDB: "Host=postgres;Database=PayDB;Username=${POSTGRES_USER:?Set POSTGRES_USER};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD};Timeout=30;Command Timeout=30"
     depends_on:
       postgres:
