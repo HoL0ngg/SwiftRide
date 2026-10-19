@@ -31,6 +31,9 @@ public class Trip
     public int MaxDriverRejections { get; }
     public IReadOnlyCollection<string> RejectedDriverIds => _rejectedDriverIds.ToArray();
     public bool IsRematchPending => Status == TripStatus.DriverOffered && OfferedDriverId == null;
+    public string? PaymentIdempotencyKey { get; private set; }
+    public Guid? PaymentId { get; private set; }
+    public PaymentFailureKind? LastPaymentFailure { get; private set; }
     public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
     internal void TransitionTo(TripState newState) => _state = newState;
@@ -42,6 +45,10 @@ public class Trip
     internal void AddRejectedDriver(string driverId) => _rejectedDriverIds.Add(driverId);
     internal void IncrementRejections() => RejectionCount++;
     internal void AddDomainEvent(IDomainEvent domainEvent) => _domainEvents.Add(domainEvent);
+    internal void SetPaymentIdempotencyKey(string key) => PaymentIdempotencyKey = key;
+    internal void SetPaymentId(Guid paymentId) => PaymentId = paymentId;
+    internal void SetLastPaymentFailure(PaymentFailureKind failureKind) => LastPaymentFailure = failureKind;
+    internal void ClearLastPaymentFailure() => LastPaymentFailure = null;
 
     public static Trip Request(Guid id, string riderId, int maxDriverRejections = 3)
     {
@@ -89,4 +96,13 @@ public class Trip
 
     public void Dropoff(string driverId, DateTimeOffset occurredAtUtc) =>
         _state.Dropoff(this, driverId, occurredAtUtc);
+
+    public void RequestPayment() =>
+        _state.RequestPayment(this);
+
+    public void SettlePayment(PaymentSettlement settlement) =>
+        _state.SettlePayment(this, settlement);
+
+    public void RecordPaymentFailure(PaymentFailureKind failureKind) =>
+        _state.RecordPaymentFailure(this, failureKind);
 }

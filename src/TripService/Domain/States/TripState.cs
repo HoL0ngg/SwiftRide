@@ -39,4 +39,13 @@ public abstract class TripState
 
     public virtual void Dropoff(Trip trip, string driverId, DateTimeOffset occurredAtUtc) =>
         throw new TripDomainException("InvalidTransition", $"Cannot drop off rider in state {Status}.");
+
+    public virtual void RequestPayment(Trip trip) =>
+        throw new TripDomainException("InvalidTransition", $"Cannot request payment in state {Status}.");
+
+    public virtual void SettlePayment(Trip trip, PaymentSettlement settlement) =>
+        throw new TripDomainException("InvalidTransition", $"Cannot settle payment in state {Status}.");
+
+    public virtual void RecordPaymentFailure(Trip trip, PaymentFailureKind failureKind) =>
+        throw new TripDomainException("InvalidTransition", $"Cannot record payment failure in state {Status}.");
 }

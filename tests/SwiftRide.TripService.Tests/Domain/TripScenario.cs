@@ -39,4 +39,12 @@ public static class TripScenario
         trip.Pickup(DriverId);
         return trip;
     }
+
+    public static Trip PendingPayment(int maxDriverRejections = 3)
+    {
+        var trip = PickedUp(maxDriverRejections);
+        trip.Dropoff(DriverId, DropoffUtc);
+        trip.RequestPayment();
+        return trip;
+    }
 }
