@@ -25,6 +25,10 @@ docker-compose.yml
 
 Quy tắc kiến trúc: [AGENTS.md](AGENTS.md). Đề bài: [docs/requirements.md](docs/requirements.md). Tài liệu và script kiểm tra: [docs/](docs/).
 
+Tài liệu nền để triển khai chức năng: [docs/architecture.md](docs/architecture.md), gồm ranh giới service, quy tắc nghiệp vụ, API, dữ liệu và lộ trình MVP.
+
+Kế hoạch triển khai chi tiết: [API Gateway skeleton](docs/superpowers/plans/2026-10-19-api-gateway-skeleton.md) và [Trip lifecycle với State Pattern](docs/superpowers/plans/2026-10-19-trip-lifecycle-state-pattern.md). Khung API Gateway đã được kiểm chứng hoàn chỉnh bằng automated HTTP tests (seam Kestrel thật, routing, JWT authentication, dev-token boundary, rate limiting 429 và upstream timeout 504 không replay mutation).
+
 ## Build và test
 
 Cần .NET 10 SDK trong PATH:
@@ -34,11 +38,16 @@ dotnet --list-sdks
 dotnet restore SwiftRide.sln
 dotnet build SwiftRide.sln
 dotnet test SwiftRide.sln
+
+# Chạy riêng bộ kiểm thử tích hợp Gateway (routing, security, rate limit, timeout):
+dotnet test tests/SwiftRide.Api.Tests/SwiftRide.Api.Tests.csproj --filter FullyQualifiedName~Gateway
 ```
 
 Mỗi service có một test placeholder `Skeleton_Compiles`; phải xóa khi có test thật. Runner xUnit được giữ theo sự cho phép của người dùng.
 
-`tests/SwiftRide.Api.Tests` kiểm tra exception handler của cả bốn ứng dụng qua HTTP trong Development và Production, gồm mã lỗi, định dạng JSON và việc ẩn dữ liệu nhạy cảm.
+`tests/SwiftRide.Api.Tests` kiểm tra:
+1. `GlobalExceptionHandler`: Xử lý ngoại lệ của cả bốn ứng dụng qua HTTP trong Development và Production, mã lỗi, định dạng JSON và ẩn dữ liệu nhạy cảm.
+2. `Gateway`: Pipeline composition chung, định tuyến public routes (`/trips/**`, `PUT /drivers/{id}/location`), chặn internal routes (`/match`, `/quote`, `/payments/**` -> 404), xác thực JWT, dev-token Development/Production, rate limiter (429) và timeout (504 không replay). Nghiệp vụ backend hiện tại vẫn trả về `501 Not Implemented` từ service stub (chưa có resource authorization và DB persistence).
 
 ## Xử lý exception
 
@@ -91,6 +100,8 @@ dotnet run --project src/TripService/Api/SwiftRide.TripService.Api.csproj
 ```
 
 Matching cần `ConnectionStrings__MatchDB` và `MongoDB__Database`; Payment cần `ConnectionStrings__PaymentDB`. Gateway cần `Jwt__Issuer`, `Jwt__Audience`, `Jwt__SigningKey`, `RateLimit__PermitLimit`, `RateLimit__WindowSeconds`, `RateLimit__QueueLimit` và hai destination address như trong Compose. Không đưa connection string thật vào tài liệu.
+
+Khi chạy trực tiếp qua `dotnet run --project src/ApiGateway/SwiftRide.ApiGateway.csproj` (launch profile), Gateway mặc định lắng nghe tại `http://localhost:5082`, khác với cổng `http://localhost:5080` khi chạy qua Docker Compose. Rate limiter của Gateway hiện dùng một fixed window chung (`gateway`).
 
 Bước tiếp theo: triển khai MVP bắt đầu từ Trip Domain và test chuyển trạng thái theo AGENTS.md.
 
