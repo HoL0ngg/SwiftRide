@@ -2,7 +2,11 @@
 
 Backend đặt xe cho môn Kiến trúc Phần mềm, dùng .NET 10 và ba service độc lập: Trip (SQL Server), Matching & Pricing (MongoDB), Payment (PostgreSQL). Client đi qua YARP API Gateway.
 
-Hiện tại chỉ có skeleton: thư viện Domain/Application/Contracts trống, DI database, health endpoint và endpoint nghiệp vụ trả về 501. Chưa có entity, migration hoặc logic nghiệp vụ.
+Hiện tại hệ thống đã hoàn thành:
+1. **API Gateway skeleton**: Composition root chung, routing public/internal, JWT authentication, dev-token boundary, rate limiter và upstream timeout đã kiểm chứng qua automated HTTP tests.
+2. **Trip Domain lifecycle**: Đầy đủ 11 trạng thái với State Pattern, bảo vệ ma trận 17 transitions, bất biến khóa giá, giới hạn từ chối tài xế `k`, sự kiện `RideCompleted` và đối chiếu kết quả thanh toán với 102 unit tests.
+
+Các tầng Application, DB persistence, contract dùng chung và các service Matching/Payment vẫn đang ở dạng skeleton, endpoint nghiệp vụ trả về 501. Chưa có entity EF Core, migration hoặc logic nghiệp vụ cho Matching/Payment.
 
 ## Cấu trúc
 
@@ -10,7 +14,7 @@ Hiện tại chỉ có skeleton: thư viện Domain/Application/Contracts trốn
 src/
   ApiGateway/                  # YARP, JWT, fixed-window rate limiter
   SwiftRide.Contracts/         # Chưa có contract
-  TripService/                 # Domain, Application, Infrastructure, Api
+  TripService/                 # Domain (State Pattern 11 states), Application, Infrastructure, Api
   MatchingService/             # Domain, Application, Infrastructure, Api
   PaymentService/              # Domain, Application, Infrastructure, Api
 tests/
@@ -27,7 +31,7 @@ Quy tắc kiến trúc: [AGENTS.md](AGENTS.md). Đề bài: [docs/requirements.m
 
 Tài liệu nền để triển khai chức năng: [docs/architecture.md](docs/architecture.md), gồm ranh giới service, quy tắc nghiệp vụ, API, dữ liệu và lộ trình MVP.
 
-Kế hoạch triển khai chi tiết: [API Gateway skeleton](docs/superpowers/plans/2026-10-19-api-gateway-skeleton.md) và [Trip lifecycle với State Pattern](docs/superpowers/plans/2026-10-19-trip-lifecycle-state-pattern.md). Khung API Gateway đã được kiểm chứng hoàn chỉnh bằng automated HTTP tests (seam Kestrel thật, routing, JWT authentication, dev-token boundary, rate limiting 429 và upstream timeout 504 không replay mutation).
+Kế hoạch triển khai chi tiết: [API Gateway skeleton](docs/superpowers/plans/2026-10-19-api-gateway-skeleton.md) và [Trip lifecycle với State Pattern](docs/superpowers/plans/2026-10-19-trip-lifecycle-state-pattern.md). Cả hai kế hoạch đã được thực thi và kiểm chứng hoàn chỉnh bằng automated test suites.
 
 ## Build và test
 
@@ -41,9 +45,12 @@ dotnet test SwiftRide.sln
 
 # Chạy riêng bộ kiểm thử tích hợp Gateway (routing, security, rate limit, timeout):
 dotnet test tests/SwiftRide.Api.Tests/SwiftRide.Api.Tests.csproj --filter FullyQualifiedName~Gateway
+
+# Chạy riêng bộ kiểm thử Trip Domain (11 states, 17 transitions, fare snapshot, driver rejection):
+dotnet test tests/SwiftRide.TripService.Tests/SwiftRide.TripService.Tests.csproj
 ```
 
-Mỗi service có một test placeholder `Skeleton_Compiles`; phải xóa khi có test thật. Runner xUnit được giữ theo sự cho phép của người dùng.
+Placeholder test của `TripService` đã được xóa và thay bằng 102 unit tests nghiệp vụ. MatchingService và PaymentService vẫn giữ test placeholder `Skeleton_Compiles` cho tới khi có test thật. Runner xUnit được giữ theo sự cho phép của người dùng.
 
 `tests/SwiftRide.Api.Tests` kiểm tra:
 1. `GlobalExceptionHandler`: Xử lý ngoại lệ của cả bốn ứng dụng qua HTTP trong Development và Production, mã lỗi, định dạng JSON và ẩn dữ liệu nhạy cảm.

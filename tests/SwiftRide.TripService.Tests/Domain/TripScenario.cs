@@ -47,4 +47,65 @@ public static class TripScenario
         trip.RequestPayment();
         return trip;
     }
+
+    public static Trip At(TripStatus status)
+    {
+        return status switch
+        {
+            TripStatus.Requested => Requested(),
+            TripStatus.Quoted => Quoted(),
+            TripStatus.DriverOffered => Offered(),
+            TripStatus.DriverAccepted => CreateDriverAccepted(),
+            TripStatus.EnRoute => CreateEnRoute(),
+            TripStatus.PickedUp => PickedUp(),
+            TripStatus.DroppedOff => CreateDroppedOff(),
+            TripStatus.PaymentPending => PendingPayment(),
+            TripStatus.Paid => CreatePaid(),
+            TripStatus.Cancelled => CreateCancelled(),
+            TripStatus.Failed => CreateFailed(),
+            _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
+        };
+    }
+
+    private static Trip CreateDriverAccepted()
+    {
+        var trip = Offered();
+        trip.AcceptDriver(DriverId);
+        return trip;
+    }
+
+    private static Trip CreateEnRoute()
+    {
+        var trip = CreateDriverAccepted();
+        trip.StartEnRoute(DriverId);
+        return trip;
+    }
+
+    private static Trip CreateDroppedOff()
+    {
+        var trip = PickedUp();
+        trip.Dropoff(DriverId, DropoffUtc);
+        return trip;
+    }
+
+    private static Trip CreatePaid()
+    {
+        var trip = PendingPayment();
+        trip.SettlePayment(new PaymentSettlement(PaymentId, TripId, Fare, "VND", trip.PaymentIdempotencyKey!));
+        return trip;
+    }
+
+    private static Trip CreateCancelled()
+    {
+        var trip = Requested();
+        trip.Cancel(RiderId);
+        return trip;
+    }
+
+    private static Trip CreateFailed()
+    {
+        var trip = Requested();
+        trip.FailNoDriverAvailable();
+        return trip;
+    }
 }
