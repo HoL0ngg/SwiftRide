@@ -1,4 +1,5 @@
 using SwiftRide.TripService.Domain;
+using SwiftRide.TripService.Domain.ValueObjects;
 
 namespace SwiftRide.TripService.Tests.Domain;
 
@@ -15,4 +16,18 @@ public static class TripScenario
 
     public static Trip Requested(int maxDriverRejections = 3) =>
         Trip.Request(TripId, RiderId, maxDriverRejections);
+
+    public static Trip Quoted(int maxDriverRejections = 3)
+    {
+        var trip = Requested(maxDriverRejections);
+        trip.ApplyQuote(new FareSnapshot(QuoteId, Fare, "VND"), DriverId);
+        return trip;
+    }
+
+    public static Trip Offered(int maxDriverRejections = 3)
+    {
+        var trip = Quoted(maxDriverRejections);
+        trip.ConfirmQuote(RiderId, QuoteId, DriverId);
+        return trip;
+    }
 }

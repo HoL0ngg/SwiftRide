@@ -6,6 +6,7 @@ namespace SwiftRide.TripService.Domain;
 public class Trip
 {
     private TripState _state;
+    private readonly List<string> _rejectedDriverIds = new();
 
     private Trip(Guid id, string riderId, int maxDriverRejections)
     {
@@ -26,6 +27,16 @@ public class Trip
     public string? AssignedDriverId { get; private set; }
     public int RejectionCount { get; private set; }
     public int MaxDriverRejections { get; }
+    public IReadOnlyCollection<string> RejectedDriverIds => _rejectedDriverIds.ToArray();
+    public bool IsRematchPending => Status == TripStatus.DriverOffered && OfferedDriverId == null;
+
+    internal void TransitionTo(TripState newState) => _state = newState;
+    internal void SetFare(FareSnapshot fare) => Fare = fare;
+    internal void LockFare() => IsFareLocked = true;
+    internal void SetCandidateDriver(string driverId) => CandidateDriverId = driverId;
+    internal void SetOfferedDriver(string? driverId) => OfferedDriverId = driverId;
+    internal void AddRejectedDriver(string driverId) => _rejectedDriverIds.Add(driverId);
+    internal void IncrementRejections() => RejectionCount++;
 
     public static Trip Request(Guid id, string riderId, int maxDriverRejections = 3)
     {
@@ -40,4 +51,25 @@ public class Trip
 
         return new Trip(id, riderId, maxDriverRejections);
     }
+
+    public void ApplyQuote(FareSnapshot fare, string candidateDriverId) =>
+        _state.ApplyQuote(this, fare, candidateDriverId);
+
+    public void FailNoDriverAvailable() =>
+        _state.FailNoDriverAvailable(this);
+
+    public void ConfirmQuote(string riderId, Guid quoteId, string offeredDriverId) =>
+        _state.ConfirmQuote(this, riderId, quoteId, offeredDriverId);
+
+    public void RejectQuote(string riderId) =>
+        _state.RejectQuote(this, riderId);
+
+    public void Cancel(string riderId) =>
+        _state.Cancel(this, riderId);
+
+    public void RejectDriver(string driverId) =>
+        _state.RejectDriver(this, driverId);
+
+    public void OfferReplacementDriver(string driverId) =>
+        _state.OfferReplacementDriver(this, driverId);
 }
