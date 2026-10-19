@@ -1,6 +1,6 @@
 namespace SwiftRide.TripService.Domain.States;
 
-public sealed class DriverOfferedState : TripState
+internal sealed class DriverOfferedState : TripState
 {
     public override TripStatus Status => TripStatus.DriverOffered;
 

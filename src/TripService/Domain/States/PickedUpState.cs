@@ -2,7 +2,7 @@ using SwiftRide.TripService.Domain.Events;
 
 namespace SwiftRide.TripService.Domain.States;
 
-public sealed class PickedUpState : TripState
+internal sealed class PickedUpState : TripState
 {
     public override TripStatus Status => TripStatus.PickedUp;
 

@@ -1,6 +1,6 @@
 namespace SwiftRide.TripService.Domain.States;
 
-public sealed class EnRouteState : TripState
+internal sealed class EnRouteState : TripState
 {
     public override TripStatus Status => TripStatus.EnRoute;
 

@@ -2,7 +2,7 @@ using SwiftRide.TripService.Domain.ValueObjects;
 
 namespace SwiftRide.TripService.Domain.States;
 
-public sealed class PaymentPendingState : TripState
+internal sealed class PaymentPendingState : TripState
 {
     public override TripStatus Status => TripStatus.PaymentPending;
     public override bool IsTerminal => false;
