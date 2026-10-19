@@ -4,6 +4,19 @@ public sealed class DriverOfferedState : TripState
 {
     public override TripStatus Status => TripStatus.DriverOffered;
 
+    public override void AcceptDriver(Trip trip, string driverId)
+    {
+        if (trip.IsRematchPending)
+            throw new TripDomainException("RematchPending", "Cannot accept while rematch is pending.");
+
+        if (string.IsNullOrWhiteSpace(driverId) || driverId != trip.OfferedDriverId)
+            throw new TripDomainException("InvalidDriver", "Driver ID does not match offered driver.");
+
+        trip.SetAssignedDriver(driverId);
+        trip.SetOfferedDriver(null);
+        trip.TransitionTo(new DriverAcceptedState());
+    }
+
     public override void RejectDriver(Trip trip, string driverId)
     {
         if (string.IsNullOrWhiteSpace(driverId) || trip.OfferedDriverId == null || driverId != trip.OfferedDriverId)

@@ -30,4 +30,13 @@ public static class TripScenario
         trip.ConfirmQuote(RiderId, QuoteId, DriverId);
         return trip;
     }
+
+    public static Trip PickedUp(int maxDriverRejections = 3)
+    {
+        var trip = Offered(maxDriverRejections);
+        trip.AcceptDriver(DriverId);
+        trip.StartEnRoute(DriverId);
+        trip.Pickup(DriverId);
+        return trip;
+    }
 }

@@ -1,3 +1,4 @@
+using SwiftRide.TripService.Domain.Events;
 using SwiftRide.TripService.Domain.States;
 using SwiftRide.TripService.Domain.ValueObjects;
 
@@ -7,6 +8,7 @@ public class Trip
 {
     private TripState _state;
     private readonly List<string> _rejectedDriverIds = new();
+    private readonly List<IDomainEvent> _domainEvents = new();
 
     private Trip(Guid id, string riderId, int maxDriverRejections)
     {
@@ -29,14 +31,17 @@ public class Trip
     public int MaxDriverRejections { get; }
     public IReadOnlyCollection<string> RejectedDriverIds => _rejectedDriverIds.ToArray();
     public bool IsRematchPending => Status == TripStatus.DriverOffered && OfferedDriverId == null;
+    public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
     internal void TransitionTo(TripState newState) => _state = newState;
     internal void SetFare(FareSnapshot fare) => Fare = fare;
     internal void LockFare() => IsFareLocked = true;
     internal void SetCandidateDriver(string driverId) => CandidateDriverId = driverId;
     internal void SetOfferedDriver(string? driverId) => OfferedDriverId = driverId;
+    internal void SetAssignedDriver(string? driverId) => AssignedDriverId = driverId;
     internal void AddRejectedDriver(string driverId) => _rejectedDriverIds.Add(driverId);
     internal void IncrementRejections() => RejectionCount++;
+    internal void AddDomainEvent(IDomainEvent domainEvent) => _domainEvents.Add(domainEvent);
 
     public static Trip Request(Guid id, string riderId, int maxDriverRejections = 3)
     {
@@ -72,4 +77,16 @@ public class Trip
 
     public void OfferReplacementDriver(string driverId) =>
         _state.OfferReplacementDriver(this, driverId);
+
+    public void AcceptDriver(string driverId) =>
+        _state.AcceptDriver(this, driverId);
+
+    public void StartEnRoute(string driverId) =>
+        _state.StartEnRoute(this, driverId);
+
+    public void Pickup(string driverId) =>
+        _state.Pickup(this, driverId);
+
+    public void Dropoff(string driverId, DateTimeOffset occurredAtUtc) =>
+        _state.Dropoff(this, driverId, occurredAtUtc);
 }

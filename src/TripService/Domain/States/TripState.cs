@@ -22,9 +22,21 @@ public abstract class TripState
     public virtual void Cancel(Trip trip, string riderId) =>
         throw new TripDomainException("InvalidTransition", $"Cannot cancel trip in state {Status}.");
 
+    public virtual void AcceptDriver(Trip trip, string driverId) =>
+        throw new TripDomainException("InvalidTransition", $"Cannot accept driver in state {Status}.");
+
     public virtual void RejectDriver(Trip trip, string driverId) =>
         throw new TripDomainException("InvalidTransition", $"Cannot reject driver in state {Status}.");
 
     public virtual void OfferReplacementDriver(Trip trip, string driverId) =>
         throw new TripDomainException("InvalidTransition", $"Cannot offer replacement driver in state {Status}.");
+
+    public virtual void StartEnRoute(Trip trip, string driverId) =>
+        throw new TripDomainException("InvalidTransition", $"Cannot start en-route in state {Status}.");
+
+    public virtual void Pickup(Trip trip, string driverId) =>
+        throw new TripDomainException("InvalidTransition", $"Cannot pick up rider in state {Status}.");
+
+    public virtual void Dropoff(Trip trip, string driverId, DateTimeOffset occurredAtUtc) =>
+        throw new TripDomainException("InvalidTransition", $"Cannot drop off rider in state {Status}.");
 }
