@@ -27,7 +27,7 @@ public static class GatewayApplication
         var signingKey = builder.Configuration["Jwt:SigningKey"]
             ?? throw new InvalidOperationException("Jwt:SigningKey is required.");
 
-        if (string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(audience) || Encoding.UTF8.GetByteCount(signingKey) < 32)
+        if (string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(audience) || string.IsNullOrWhiteSpace(signingKey) || Encoding.UTF8.GetByteCount(signingKey) < 32)
             throw new InvalidOperationException("JWT issuer, audience and a signing key of at least 32 bytes are required.");
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey));
