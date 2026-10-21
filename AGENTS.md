@@ -16,7 +16,7 @@ A working basic flow is worth more than an incomplete, highly complex distribute
 1. The user's request in the current task.
 2. This `AGENTS.md`.
 3. `docs/requirements.md` and other docs under `docs/`.
-4. Existing code and tests (the source of truth for *current behavior*).
+4. Existing code and tests (the source of truth for _current behavior_).
 
 If docs and code disagree: state the mismatch, keep working behavior, and propose the smallest safe change.
 Do not silently replace the architecture with a different one.
@@ -62,22 +62,23 @@ States: `Requested`, `Quoted`, `DriverOffered`, `DriverAccepted`, `EnRoute`, `Pi
 `PaymentPending`, `Paid`, `Cancelled`, `Failed`.
 Terminal states: **`Paid`, `Cancelled`, `Failed`** only. `PaymentPending` is NOT terminal.
 
-| From | Trigger | To | Notes |
-|---|---|---|---|
-| `Requested` | Matching returns quote + candidate driver | `Quoted` | No driver available → `Failed` |
-| `Quoted` | Rider confirms price | `DriverOffered` | Fare is locked from here on |
-| `Quoted` | Rider rejects price | `Cancelled` | |
-| `DriverOffered` | Driver accepts | `DriverAccepted` | |
-| `DriverOffered` | Driver rejects, rejections ≤ k | `DriverOffered` | Re-match another driver, increment counter |
-| `DriverOffered` | Driver rejects, rejections > k | `Failed` | k is configurable (default 3) |
-| `DriverAccepted` | Driver starts heading to rider | `EnRoute` | |
-| `EnRoute` | Driver picks up rider | `PickedUp` | |
-| `PickedUp` | Driver drops off rider | `DroppedOff` | Emit `RideCompleted` |
-| `DroppedOff` | Payment requested | `PaymentPending` | |
-| `PaymentPending` | `PaymentSettled` | `Paid` | |
-| `PaymentPending` | Transient failure | `PaymentPending` | Bounded retry, same idempotency key |
+| From             | Trigger                                   | To               | Notes                                      |
+| ---------------- | ----------------------------------------- | ---------------- | ------------------------------------------ |
+| `Requested`      | Matching returns quote + candidate driver | `Quoted`         | No driver available → `Failed`             |
+| `Quoted`         | Rider confirms price                      | `DriverOffered`  | Fare is locked from here on                |
+| `Quoted`         | Rider rejects price                       | `Cancelled`      |                                            |
+| `DriverOffered`  | Driver accepts                            | `DriverAccepted` |                                            |
+| `DriverOffered`  | Driver rejects, rejections ≤ k            | `DriverOffered`  | Re-match another driver, increment counter |
+| `DriverOffered`  | Driver rejects, rejections > k            | `Failed`         | k is configurable (default 3)              |
+| `DriverAccepted` | Driver starts heading to rider            | `EnRoute`        |                                            |
+| `EnRoute`        | Driver picks up rider                     | `PickedUp`       |                                            |
+| `PickedUp`       | Driver drops off rider                    | `DroppedOff`     | Emit `RideCompleted`                       |
+| `DroppedOff`     | Payment requested                         | `PaymentPending` |                                            |
+| `PaymentPending` | `PaymentSettled`                          | `Paid`           |                                            |
+| `PaymentPending` | Transient failure                         | `PaymentPending` | Bounded retry, same idempotency key        |
 
 Rules:
+
 - Cancellation is allowed only before `DriverAccepted` unless the task says otherwise.
 - If payment keeps failing after the retry limit, the trip stays `PaymentPending`. NEVER mark it `Paid` falsely or charge twice.
 - Any transition not in the table throws a domain exception. Every row needs a unit test, and so does at least one invalid transition per state.
@@ -116,11 +117,11 @@ entries in one local transaction). Handles refunds and compensation.
 
 Public routes (through the Gateway, JWT required):
 
-| Route | Caller |
-|---|---|
-| `POST /trips`, `GET /trips/{id}`, `POST /trips/{id}/confirm-quote`, `POST /trips/{id}/cancel` | Rider |
-| `POST /trips/{id}/driver-accept`, `/driver-reject`, `/en-route`, `/pickup`, `/dropoff` | Driver |
-| `PUT /drivers/{id}/location` | Driver |
+| Route                                                                                         | Caller |
+| --------------------------------------------------------------------------------------------- | ------ |
+| `POST /trips`, `GET /trips/{id}`, `POST /trips/{id}/confirm-quote`, `POST /trips/{id}/cancel` | Rider  |
+| `POST /trips/{id}/driver-accept`, `/driver-reject`, `/en-route`, `/pickup`, `/dropoff`        | Driver |
+| `PUT /drivers/{id}/location`                                                                  | Driver |
 
 Internal routes (NOT exposed by the Gateway): `POST /match`, `POST /quote` (called by Trip Service),
 `POST /payments`, `POST /payments/{id}/refund` (called by Trip Service or via events).
@@ -167,6 +168,7 @@ SwiftRide/
 - NEVER create a generic `Common` project containing business logic.
 
 SOLID, applied concretely (keep it visible in the code):
+
 - **SRP**: pricing, persistence, transport and messaging live in separate classes (`FareCalculator` ≠ `TripRepository`).
 - **OCP**: new pricing modes are new `IPricingStrategy` implementations; existing ones are not edited.
 - **LSP**: every strategy honors the contract (`price >= 0`); enforce it with tests, not only runtime checks.
