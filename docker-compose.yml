@@ -47,6 +47,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ConnectionStrings__PaymentDB: "Host=postgres;Database=PayDB;Username=${POSTGRES_USER:?Set POSTGRES_USER};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD};Timeout=30;Command Timeout=30"
+      Database__MigrateOnStartup: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,7 +73,11 @@ services:
     volumes:
       - trip-data:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -d TripDB -l 5 -b -Q \"SELECT 1\" >/dev/null"]
+      test:
+        [
+          "CMD-SHELL",
+          '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -d TripDB -l 5 -b -Q "SELECT 1" >/dev/null',
+        ]
       interval: 10s
       timeout: 10s
       retries: 15
@@ -87,7 +92,11 @@ services:
     volumes:
       - match-data:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "mongosh --quiet --username \"$$MONGO_INITDB_ROOT_USERNAME\" --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval \"quit(db.adminCommand({ping:1}).ok ? 0 : 1)\""]
+      test:
+        [
+          "CMD-SHELL",
+          'mongosh --quiet --username "$$MONGO_INITDB_ROOT_USERNAME" --password "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "quit(db.adminCommand({ping:1}).ok ? 0 : 1)"',
+        ]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -102,7 +111,7 @@ services:
     volumes:
       - payment-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d PayDB"]
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d PayDB']
       interval: 10s
       timeout: 5s
       retries: 10
