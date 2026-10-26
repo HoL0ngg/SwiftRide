@@ -1,5 +1,9 @@
 # Kiến trúc triển khai SwiftRide
 
+> Cập nhật 26/10/2026: Matching và Payment đã có schema riêng trên PostgreSQL của Supabase;
+> xem [thiết kế và trạng thái triển khai database](database-supabase.md). Phần MongoDB và mô hình
+> bảng đầy đủ bên dưới là thiết kế cũ/mục tiêu, chưa phản ánh adapter runtime đã được chuyển đổi.
+
 > Tài liệu nền để hiểu yêu cầu, chia chức năng và triển khai trên repository hiện tại.
 > Ngày đối chiếu: 19/10/2026. Đây là thiết kế mục tiêu; các chức năng chưa được triển khai được ghi rõ bên dưới.
 
