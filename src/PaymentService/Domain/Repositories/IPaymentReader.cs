@@ -5,4 +5,5 @@ public interface IPaymentReader   // 7.1 ISP: use case chỉ đọc thì chỉ c
 {
     Task<Payment?> GetByIdAsync(Guid id, CancellationToken ct);
     Task<Payment?> GetByIdempotencyKeyAsync(string key, CancellationToken ct);
+    Task<Payment?> GetByTripIdAsync(Guid tripId, CancellationToken ct);
 }

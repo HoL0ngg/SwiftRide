@@ -12,6 +12,7 @@ public static class DependencyInjection
         services.AddScoped<ProcessPaymentUseCase>();  // 19.2 Use case là Java-thuần-kiểu: không attribute, đăng ký ở đây
         services.AddScoped<RefundPaymentUseCase>();
         services.AddScoped<GetPaymentUseCase>();
+        services.AddScoped<GetPaymentByTripUseCase>();
         return services;
     }
 }
