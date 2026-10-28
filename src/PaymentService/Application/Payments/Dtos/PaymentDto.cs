@@ -1,9 +1,11 @@
 namespace SwiftRide.PaymentService.Application.Payments.Dtos;
 
-public sealed record LedgerEntryDto(Guid Id, string Account, string Direction, string Type,
-    decimal Amount, string Currency, DateTimeOffset CreatedAt);
+public sealed record LedgerEntryDto(string Account, string Direction, decimal Amount, string Currency, DateTimeOffset CreatedAt);
 
-public sealed record PaymentDto(Guid Id, Guid TripId, Guid RiderId, Guid DriverId, decimal Amount, string Currency,
-    string Method, string Status, string? FailureReason, string? RefundReason, DateTimeOffset CreatedAt,
-    DateTimeOffset? CompletedAt, DateTimeOffset? RefundedAt, IReadOnlyList<LedgerEntryDto> LedgerEntries);
-// 13.1 DTO phẳng, không lộ entity Payment ra API (AGENTS: never expose persistence entities)
+public sealed record RefundDto(Guid Id, decimal Amount, string Currency, string Reason, string Status,
+    DateTimeOffset CreatedAt, DateTimeOffset? SettledAt, IReadOnlyList<LedgerEntryDto> LedgerEntries);
+
+public sealed record PaymentDto(Guid Id, Guid TripId, string RiderId, string? DriverId, decimal Amount, string Currency,
+    string Method, string Status, string? FailureCode, DateTimeOffset CreatedAt, DateTimeOffset? SettledAt,
+    IReadOnlyList<LedgerEntryDto> LedgerEntries, RefundDto? Refund);
+// DTO phẳng, không lộ entity Payment ra API

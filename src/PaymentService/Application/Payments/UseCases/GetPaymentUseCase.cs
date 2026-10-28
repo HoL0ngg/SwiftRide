@@ -3,7 +3,7 @@ using SwiftRide.PaymentService.Application.Payments.Dtos;
 using SwiftRide.PaymentService.Domain.Repositories;
 namespace SwiftRide.PaymentService.Application.Payments.UseCases;
 
-public sealed class GetPaymentUseCase(IPaymentReader reader)   // 18.1 ISP: chỉ cần Reader
+public sealed class GetPaymentUseCase(IPaymentReader reader)   // ISP: chỉ cần Reader
 {
     public async Task<PaymentDto> ExecuteAsync(Guid id, CancellationToken ct)
     {

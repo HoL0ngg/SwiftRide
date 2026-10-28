@@ -12,15 +12,17 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("PaymentDB")
+        // Chuỗi kết nối Supabase (Postgres). KHÔNG ghi vào appsettings: dùng user-secrets hoặc biến môi trường
+        // ConnectionStrings__PaymentDB
+        var connectionString = configuration.GetConnectionString("PaymentDB") // lấy env
             ?? throw new InvalidOperationException("ConnectionStrings:PaymentDB is required.");
         services.AddDbContext<PaymentDbContext>(options => options.UseNpgsql(connectionString));
 
-        services.AddScoped<IPaymentReader, PaymentRepository>();         // 28.1 Port (Domain) -> Adapter (Infrastructure)
+        services.AddScoped<IPaymentReader, PaymentRepository>();         // Port (Domain) -> Adapter (Infrastructure)
         services.AddScoped<IPaymentWriter, PaymentRepository>();
         services.AddScoped<IUnitOfWork, PaymentUnitOfWork>();
 
-        services.AddSingleton<IPaymentGateway, MockCardGateway>();       // 28.2 Muốn thêm ví/ngân hàng: thêm 1 dòng ở đây
+        services.AddSingleton<IPaymentGateway, MockCardGateway>();       // Muốn thêm ví/ngân hàng: thêm 1 dòng ở đây
         services.AddSingleton<IPaymentGateway, MockWalletGateway>();
         services.AddSingleton<IPaymentGatewayFactory, PaymentGatewayFactory>();
 

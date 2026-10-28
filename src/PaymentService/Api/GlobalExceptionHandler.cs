@@ -11,12 +11,12 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        var (statusCode, detail) = Classify(exception);                  // 34.1 Thay cho dòng tính statusCode cũ
+        var (statusCode, detail) = Classify(exception);
         var traceId = Activity.Current?.Id ?? httpContext.TraceIdentifier;
 
         logger.Log(statusCode >= 500 ? LogLevel.Error : LogLevel.Warning,
             "Request failed with {StatusCode}. Exception type: {ExceptionType}. TraceId: {TraceId}",
-            statusCode, exception.GetType().FullName, traceId);          // 34.2 Giữ nguyên: chỉ log tên kiểu, không log message
+            statusCode, exception.GetType().FullName, traceId);          // chỉ log tên kiểu, không log message
 
         await Results.Problem(
             statusCode: statusCode,
@@ -27,12 +27,12 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
         return true;
     }
 
-    // 34.3 Ánh xạ exception nghiệp vụ -> HTTP. THỨ TỰ QUAN TRỌNG: lớp con phải đứng trước DomainException
+    // Ánh xạ exception nghiệp vụ -> HTTP. THỨ TỰ QUAN TRỌNG: lớp con phải đứng trước DomainException
     private static (int StatusCode, string Detail) Classify(Exception exception) => exception switch
     {
         BadHttpRequestException { StatusCode: >= 400 and < 500 } bad =>
             (bad.StatusCode, "The request could not be processed. Check the request format and size."),
-        InvalidPaymentStateException or IdempotencyConflictException or ConcurrentPaymentUpdateException =>
+        InvalidPaymentStateException or IdempotencyConflictException =>
             (StatusCodes.Status409Conflict, exception.Message),
         DomainException => (StatusCodes.Status400BadRequest, exception.Message),
         PaymentNotFoundException => (StatusCodes.Status404NotFound, exception.Message),

@@ -1,4 +1,8 @@
 namespace SwiftRide.PaymentService.Domain.Enums;
 
-public enum PaymentStatus { Pending = 0, Settled = 1, Failed = 2, Refunded = 3 }
-// 1.1 Pending chỉ tồn tại trong bộ nhớ, không lưu DB
+// Khớp CHECK của DB: payments.status / refunds.status IN ('pending','settled','failed')
+// Pending chỉ sống trong bộ nhớ (trước khi gọi cổng). Hoàn tiền KHÔNG phải là một status của payment:
+// nó là một dòng riêng trong bảng refunds.
+public enum PaymentStatus { Pending = 0, Settled = 1, Failed = 2 }
+
+public enum RefundStatus { Pending = 0, Settled = 1, Failed = 2 }
