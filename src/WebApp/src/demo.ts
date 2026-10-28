@@ -30,18 +30,21 @@ const storageKey = 'swiftride-demo-v1';
 const emptyState = (): DemoState => ({ trip: null, history: [], online: true });
 const terminal = (status: TripStatus) => status === 'Paid' || status === 'Cancelled' || status === 'Failed';
 
-function isPlace(value: unknown): value is Place {
+export function isPlace(value: unknown): value is Place {
   if (!value || typeof value !== 'object') return false;
   const place = value as Partial<Place>;
-  return places.some(candidate => candidate.id === place.id && candidate.name === place.name &&
-    candidate.address === place.address && candidate.lat === place.lat && candidate.lng === place.lng);
+  return typeof place.id === 'string' && place.id.trim().length > 0 && place.id.length <= 200 &&
+    typeof place.name === 'string' && place.name.trim().length > 0 && place.name.length <= 1000 &&
+    typeof place.address === 'string' && place.address.trim().length > 0 && place.address.length <= 2000 &&
+    typeof place.lat === 'number' && Number.isFinite(place.lat) && Math.abs(place.lat) <= 90 &&
+    typeof place.lng === 'number' && Number.isFinite(place.lng) && Math.abs(place.lng) <= 180;
 }
 
 function isTrip(value: unknown): value is Trip {
   if (!value || typeof value !== 'object') return false;
   const trip = value as Partial<Trip>;
   return typeof trip.id === 'string' && trip.id.length > 0 && isPlace(trip.pickup) && isPlace(trip.destination) &&
-    trip.pickup.id !== trip.destination.id && typeof trip.fare === 'number' && Number.isSafeInteger(trip.fare) && trip.fare >= 0 &&
+    (trip.pickup.lat !== trip.destination.lat || trip.pickup.lng !== trip.destination.lng) && typeof trip.fare === 'number' && Number.isSafeInteger(trip.fare) && trip.fare >= 0 &&
     typeof trip.distanceKm === 'number' && Number.isFinite(trip.distanceKm) && trip.distanceKm > 0 &&
     typeof trip.durationMinutes === 'number' && Number.isSafeInteger(trip.durationMinutes) && trip.durationMinutes > 0 &&
     statuses.includes(trip.status as TripStatus) && Number.isInteger(trip.rejections) && trip.rejections! >= 0 && trip.rejections! <= 4 &&
@@ -126,21 +129,19 @@ async function transition(from: TripStatus[], to: TripStatus) {
 }
 
 export const demoApi = {
-  async quote(pickupId: string, destinationId: string, paymentMethod: 'wallet' | 'card'): Promise<void> {
+  async quote(pickup: Place, destination: Place, paymentMethod: 'wallet' | 'card'): Promise<void> {
     await latency();
     if (state.trip && !terminal(state.trip.status)) throw new Error('Hãy hoàn tất hoặc hủy chuyến hiện tại trước khi đặt chuyến mới.');
     if (!state.online) throw new Error('Hiện chưa có tài xế sẵn sàng. Vui lòng thử lại khi tài xế bật nhận chuyến.');
-    const pickup = places.find(place => place.id === pickupId);
-    const destination = places.find(place => place.id === destinationId);
-    if (!pickup || !destination) throw new Error('Vui lòng chọn điểm đón và điểm đến trong danh sách.');
-    if (pickup.id === destination.id) throw new Error('Điểm đón và điểm đến cần khác nhau.');
+    if (!isPlace(pickup) || !isPlace(destination)) throw new Error('Điểm đón hoặc điểm đến không hợp lệ.');
+    if (pickup.lat === destination.lat && pickup.lng === destination.lng) throw new Error('Điểm đón và điểm đến cần khác nhau.');
     if (paymentMethod !== 'wallet' && paymentMethod !== 'card') throw new Error('Phương thức thanh toán không hợp lệ.');
     const radians = (degrees: number) => degrees * Math.PI / 180;
     const latitude = radians(destination.lat - pickup.lat);
     const longitude = radians(destination.lng - pickup.lng);
     const haversine = Math.sin(latitude / 2) ** 2 + Math.cos(radians(pickup.lat)) * Math.cos(radians(destination.lat)) * Math.sin(longitude / 2) ** 2;
-    // shortcut: straight-line distance × 1.3 approximates roads, replace with backend quotes when connecting the Gateway.
-    const distanceKm = Math.round(6371 * 2 * Math.asin(Math.sqrt(haversine)) * 1.3 * 10) / 10;
+    // shortcut: Haversine is not a road route, replace demo pricing with Trip quotes when integrating the backend.
+    const distanceKm = Math.max(0.1, Math.round(6371 * 2 * Math.asin(Math.sqrt(Math.min(1, haversine))) * 10) / 10);
     const durationMinutes = Math.max(3, Math.round(distanceKm * 4));
     const fare = Math.round((12000 + distanceKm * 7500 + durationMinutes * 300) / 1000) * 1000;
     updateTrip({ id: crypto.randomUUID(), pickup, destination, fare, distanceKm, durationMinutes,

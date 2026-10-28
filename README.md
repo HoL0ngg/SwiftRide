@@ -1,6 +1,8 @@
 # SwiftRide
 
-Backend đặt xe cho môn Kiến trúc Phần mềm, dùng .NET 10 và ba service độc lập: Trip (SQL Server), Matching & Pricing (MongoDB), Payment (PostgreSQL). Client đi qua YARP API Gateway.
+> Cập nhật Matching 28/10/2026: đã triển khai Clean Architecture, Npgsql/schema matchdb, báo giá từ tọa độ và tìm địa chỉ Nominatim. Xem [hướng dẫn hiện hành](docs/matching-pricing.md). Các mô tả scaffold chưa triển khai Matching bên dưới là trạng thái lịch sử.
+
+Backend đặt xe cho môn Kiến trúc Phần mềm, dùng .NET 10 và ba service độc lập: Trip (SQL Server), Matching & Pricing (Supabase PostgreSQL, schema `matchdb`), Payment (Supabase PostgreSQL, schema `paydb`). Client đi qua YARP API Gateway.
 
 Hiện tại hệ thống đã hoàn thành:
 1. **API Gateway skeleton**: Composition root chung, routing public/internal, JWT authentication, dev-token boundary, rate limiter và upstream timeout đã kiểm chứng qua automated HTTP tests.
@@ -70,6 +72,8 @@ Tham khảo: [xử lý lỗi ASP.NET Core 10](https://learn.microsoft.com/en-us/
 
 ## Chạy bằng Docker Compose
 
+> Matching và Payment dùng Supabase PostgreSQL với schema riêng. Adapter Matching và Compose chưa hoàn tất chuyển đổi; hướng dẫn scaffold dưới đây chưa bảo đảm chạy được luồng Supabase hoàn chỉnh. Xem [trạng thái database](docs/database-supabase.md).
+
 Cần Docker daemon đang chạy. Tạo cấu hình local rồi thay tất cả password/signing key mẫu:
 
 ```powershell
@@ -80,7 +84,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File docs/check-skeleton.ps1
 docker compose down
 ```
 
-`.env` được git-ignore; không đưa secrets vào Git. Khi đổi thông tin đăng nhập, database volume đã tồn tại không tự cập nhật password. MongoDB credentials trong connection URI cần URL-encode ký tự đặc biệt.
+`.env` được git-ignore; không đưa secrets vào Git. Khi đổi thông tin đăng nhập, database volume đã tồn tại không tự cập nhật password. Connection string Supabase dùng Npgsql, TLS, timeout và tài khoản riêng theo service.
 
 Gateway ở `http://localhost:5080`; chỉ gateway publish port. Các service nghe cổng 8080 trong network Compose; mỗi service chỉ phụ thuộc database riêng. Health endpoint của gateway và service là liveness, chưa kiểm tra kết nối database.
 
@@ -106,7 +110,7 @@ $env:ConnectionStrings__TripDB = '<connection string của TripDB>'
 dotnet run --project src/TripService/Api/SwiftRide.TripService.Api.csproj
 ```
 
-Matching cần `ConnectionStrings__MatchDB` và `MongoDB__Database`; Payment cần `ConnectionStrings__PaymentDB`. Gateway cần `Jwt__Issuer`, `Jwt__Audience`, `Jwt__SigningKey`, `RateLimit__PermitLimit`, `RateLimit__WindowSeconds`, `RateLimit__QueueLimit` và hai destination address như trong Compose. Không đưa connection string thật vào tài liệu.
+Cấu hình đích: Matching dùng `ConnectionStrings__MatchDB` (Npgsql, schema `matchdb`); Payment dùng `ConnectionStrings__PaymentDB` (schema `paydb`). Adapter Matching hiện chưa chuyển sang PostgreSQL. Gateway cần `Jwt__Issuer`, `Jwt__Audience`, `Jwt__SigningKey`, `RateLimit__PermitLimit`, `RateLimit__WindowSeconds`, `RateLimit__QueueLimit` và hai destination address như trong Compose. Không đưa connection string thật vào tài liệu.
 
 Khi chạy trực tiếp qua `dotnet run --project src/ApiGateway/SwiftRide.ApiGateway.csproj` (launch profile), Gateway mặc định lắng nghe tại `http://localhost:5082`, khác với cổng `http://localhost:5080` khi chạy qua Docker Compose. Rate limiter của Gateway hiện dùng một fixed window chung (`gateway`).
 

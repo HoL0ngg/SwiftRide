@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DemoState, Place, Trip, TripStatus } from './demo'
 import RiderView from './RiderView'
 import DriverView from './DriverView'
+const Rider = () => <RiderView pickup={mock.places[0]} destination={mock.places[1]} selection={null} onChange={() => {}} onSelectMap={() => {}} onSwap={() => {}} />
 
 const mock = vi.hoisted(() => ({
   state: { trip: null, history: [], online: true } as DemoState,
@@ -39,10 +40,12 @@ beforeEach(() => {
 
 describe('rider booking and trip controls', () => {
   it('starts with two labeled places and requests a quote before confirmation', () => {
-    const html = renderToStaticMarkup(<RiderView />)
-    expect(html).toMatch(/<select[^>]+aria-label="Điểm đón"/)
-    expect(html).toMatch(/<select[^>]+aria-label="Điểm đến"/)
+    const html = renderToStaticMarkup(<Rider />)
+    expect(html).toMatch(/<input[^>]+aria-label="Điểm đón"/)
+    expect(html).toMatch(/<input[^>]+aria-label="Điểm đến"/)
     expect(buttons(html)).toContain('Xem giá chuyến đi')
+    expect(buttons(html).filter(label => label === 'Tìm')).toHaveLength(2)
+    expect(text(html)).toContain('Haversine')
     expect(buttons(html)).not.toContain('Xác nhận giá &amp; đặt xe')
     expect(text(html)).toContain('Ví SwiftPay')
     expect(text(html)).toContain('Thẻ demo')
@@ -50,20 +53,20 @@ describe('rider booking and trip controls', () => {
 
   it('offers price confirmation and rejection on a quote', () => {
     mock.state.trip = trip('Quoted')
-    const actions = buttons(renderToStaticMarkup(<RiderView />))
+    const actions = buttons(renderToStaticMarkup(<Rider />))
     expect(actions).toContain('Xác nhận giá &amp; đặt xe')
     expect(actions).toContain('Chọn lại hành trình')
   })
 
   it('allows cancellation while waiting for driver acceptance', () => {
     mock.state.trip = trip('DriverOffered')
-    expect(buttons(renderToStaticMarkup(<RiderView />))).toContain('Hủy chuyến đi')
+    expect(buttons(renderToStaticMarkup(<Rider />))).toContain('Hủy chuyến đi')
   })
 
   it.each<TripStatus>(['DriverAccepted', 'EnRoute', 'PickedUp', 'DroppedOff', 'PaymentPending', 'Paid'])(
     'does not offer cancellation once the trip is %s', status => {
       mock.state.trip = trip(status)
-      const actions = buttons(renderToStaticMarkup(<RiderView />))
+      const actions = buttons(renderToStaticMarkup(<Rider />))
       expect(actions).not.toContain('Hủy chuyến đi')
       expect(actions).not.toContain('Chọn lại hành trình')
     },
@@ -71,7 +74,7 @@ describe('rider booking and trip controls', () => {
 })
 
 describe('payment state is visible to both roles', () => {
-  it.each([['rider', RiderView], ['driver', DriverView]] as const)(
+  it.each([['rider', Rider], ['driver', DriverView]] as const)(
     '%s keeps PaymentPending distinct from a paid trip', (_role, View) => {
       mock.state.trip = trip('PaymentPending')
       const html = renderToStaticMarkup(<View />)

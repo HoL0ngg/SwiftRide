@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import RideMap from './RideMap';
+import RideMap, { MapControls } from './RideMap';
+import { DomEvent } from 'leaflet';
+
+vi.mock('leaflet', () => ({ DomEvent: { disableClickPropagation: vi.fn() } }));
+vi.mock('react', async importOriginal => ({ ...await importOriginal<typeof import('react')>(), useEffect: () => {} }));
 
 type TileEvent = { tile: HTMLImageElement };
 type TileProps = {
@@ -10,17 +14,19 @@ type TileProps = {
   eventHandlers: Record<string, (event: TileEvent) => void>;
 };
 
-const captured = vi.hoisted(() => ({ tiles: null as TileProps | null }));
+const captured = vi.hoisted(() => ({ tiles: null as TileProps | null, markers: [] as number[][],
+  click: null as null | ((event: { latlng: { wrap: () => { lat: number; lng: number } } }) => void) }));
 
 vi.mock('react-leaflet', () => ({
   MapContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  CircleMarker: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  CircleMarker: ({ children, center }: { children: ReactNode; center: number[] }) => { captured.markers.push(center); return <div>{children}</div>; },
   Tooltip: ({ children }: { children: ReactNode }) => <span>{children}</span>,
   TileLayer: (props: TileProps) => {
     captured.tiles = props;
     return null;
   },
   useMap: () => ({ fitBounds: vi.fn(), setView: vi.fn(), invalidateSize: vi.fn(), getContainer: vi.fn() }),
+  useMapEvents: ({ click }: { click: typeof captured.click }) => { captured.click = click; },
 }));
 
 vi.mock('./demo', () => ({
@@ -32,6 +38,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal('window', globalThis);
   captured.tiles = null;
+  captured.markers = [];
   renderToStaticMarkup(<RideMap />);
 });
 
@@ -42,6 +49,31 @@ afterEach(() => {
 });
 
 describe('OpenStreetMap tiles', () => {
+  it('protects the recenter button at the native Leaflet event boundary', () => {
+    const control = MapControls({ pickup: { id: 'p', name: 'Pickup', address: 'A', lat: 21, lng: 105 } });
+    const button = {} as HTMLButtonElement;
+    expect(control.props.ref).toBeTypeOf('function');
+    control.props.ref(button);
+    expect(DomEvent.disableClickPropagation).toHaveBeenCalledWith(button);
+  });
+
+  it('previews both chosen coordinates before a trip exists', () => {
+    captured.markers = [];
+    const preview = {
+      pickup: { id: 'p', name: 'Pickup', address: 'A', lat: 21, lng: 105 },
+      destination: { id: 'd', name: 'Destination', address: 'B', lat: 21.1, lng: 105.1 },
+    };
+    renderToStaticMarkup(<RideMap preview={preview} />);
+    expect(captured.markers).toEqual([[21, 105], [21.1, 105.1]]);
+  });
+
+  it('returns the clicked coordinate to the booking form when selection is enabled', () => {
+    const select = vi.fn();
+    renderToStaticMarkup(<RideMap onSelect={select} />);
+    captured.click!({ latlng: { wrap: () => ({ lat: 21.03, lng: 105.84 }) } });
+    expect(select).toHaveBeenCalledWith(expect.objectContaining({ lat: 21.03, lng: 105.84, address: '21.03000, 105.84000' }));
+  });
+
   it('uses real OpenStreetMap tiles and credits the contributors', () => {
     expect(captured.tiles?.url).toBe('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
     expect(captured.tiles?.attribution).toContain('OpenStreetMap');

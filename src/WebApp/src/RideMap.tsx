@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { TileEvent } from 'leaflet';
-import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from 'react-leaflet';
+import { DomEvent } from 'leaflet';
+import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import { LocateFixed, MapPin } from 'lucide-react';
 import { places, useDemo } from './demo';
 import type { Place } from './demo';
 
-function MapControls({ pickup, destination }: { pickup: Place; destination?: Place }) {
+export function MapControls({ pickup, destination }: { pickup: Place; destination?: Place }) {
   const map = useMap();
   function recenter() {
     if (destination) map.fitBounds([[pickup.lat, pickup.lng], [destination.lat, destination.lng]], { padding: [65, 95], maxZoom: 15 });
@@ -16,14 +17,27 @@ function MapControls({ pickup, destination }: { pickup: Place; destination?: Pla
     observer.observe(map.getContainer());
     return () => observer.disconnect();
   }, [map]);
-  useEffect(recenter, [map, pickup.id, destination?.id]);
-  return <button className="map-recenter" onClick={recenter} aria-label="Đưa bản đồ về chuyến đi" title="Về vị trí chuyến đi"><LocateFixed size={21} /></button>;
+  useEffect(recenter, [map, pickup.lat, pickup.lng, destination?.lat, destination?.lng]);
+  return <button ref={element => { if (element) DomEvent.disableClickPropagation(element); }} className="map-recenter" onClick={recenter} aria-label="Đưa bản đồ về chuyến đi" title="Về vị trí chuyến đi"><LocateFixed size={21} /></button>;
 }
 
-export default function RideMap() {
+function MapSelection({ onSelect }: { onSelect?: (place: Place) => void }) {
+  useMapEvents({ click: ({ latlng }) => {
+    if (!onSelect) return;
+    const point = latlng.wrap();
+    if (Math.abs(point.lat) > 90) return;
+    const address = `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`;
+    onSelect({ id: `map-${point.lat}-${point.lng}`, name: 'Điểm đã chọn trên bản đồ', address, lat: point.lat, lng: point.lng });
+  } });
+  return null;
+}
+
+type Props = { preview?: { pickup: Place; destination: Place }; onSelect?: (place: Place) => void };
+
+export default function RideMap({ preview, onSelect }: Props = {}) {
   const { trip } = useDemo();
-  const pickup = trip?.pickup ?? places[0];
-  const destination = trip?.destination;
+  const pickup = trip?.pickup ?? preview?.pickup ?? places[0];
+  const destination = trip?.destination ?? preview?.destination;
   const [tileError, setTileError] = useState(false);
   const [tileAttempt, setTileAttempt] = useState(0);
   const tileTimers = useRef(new Map<HTMLElement, ReturnType<typeof setTimeout>>());
@@ -54,6 +68,7 @@ export default function RideMap() {
       <CircleMarker center={[pickup.lat, pickup.lng]} radius={9} pathOptions={{ color: '#ffffff', weight: 4, fillColor: '#047857', fillOpacity: 1 }}><Tooltip direction="top" permanent offset={[0, -11]}>{trip ? `Đón: ${pickup.name}` : pickup.name}</Tooltip></CircleMarker>
       {destination && <CircleMarker center={[destination.lat, destination.lng]} radius={9} pathOptions={{ color: '#ffffff', weight: 4, fillColor: '#f59e0b', fillOpacity: 1 }}><Tooltip direction="top" permanent offset={[0, -11]}>Đến: {destination.name}</Tooltip></CircleMarker>}
       <MapControls pickup={pickup} destination={destination} />
+      <MapSelection onSelect={trip ? undefined : onSelect} />
     </MapContainer>
     {tileError && <div className="map-error" role="status"><MapPin size={16} className="shrink-0" /><span>Một số ô bản đồ chưa tải được. Hãy kiểm tra kết nối mạng.</span><button className="ml-auto shrink-0 rounded border border-amber-300 px-2 py-1 font-semibold" onClick={() => { setTileError(false); setTileAttempt(attempt => attempt + 1); }}>Thử lại</button></div>}
   </>;

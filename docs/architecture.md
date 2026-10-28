@@ -1,8 +1,10 @@
 # Kiến trúc triển khai SwiftRide
 
+> Cập nhật Matching 28/10/2026: đã triển khai Clean Architecture, Npgsql/schema matchdb, báo giá từ tọa độ và tìm địa chỉ Nominatim. Xem [hướng dẫn hiện hành](matching-pricing.md). Các mô tả scaffold chưa triển khai Matching bên dưới là trạng thái lịch sử.
+
 > Cập nhật 26/10/2026: Matching và Payment đã có schema riêng trên PostgreSQL của Supabase;
-> xem [thiết kế và trạng thái triển khai database](database-supabase.md). Phần MongoDB và mô hình
-> bảng đầy đủ bên dưới là thiết kế cũ/mục tiêu, chưa phản ánh adapter runtime đã được chuyển đổi.
+> xem [thiết kế và trạng thái triển khai database](database-supabase.md). Mô hình
+> bảng đầy đủ bên dưới là thiết kế mục tiêu; adapter Matching chưa chuyển sang Supabase. Matching sở hữu schema `matchdb`, Payment sở hữu `paydb`.
 
 > Tài liệu nền để hiểu yêu cầu, chia chức năng và triển khai trên repository hiện tại.
 > Ngày đối chiếu: 19/10/2026. Đây là thiết kế mục tiêu; các chức năng chưa được triển khai được ghi rõ bên dưới.
@@ -63,7 +65,7 @@ Trong tài liệu này:
 | Solution và phân tầng | `.NET 10`, ba service có `Domain/Application/Infrastructure/Api` | Các lớp nghiệp vụ bên trong |
 | Gateway | YARP, xác thực JWT, rate limiter, `/health`, `/dev/token` chỉ Development; automated tests seam Kestrel thật, routing, 429 và timeout 504 | Kiểm tra phân quyền theo vai trò trong service use case |
 | Trip Service | Các route nghiệp vụ đã khai báo; Trip aggregate đầy đủ 11 trạng thái với State Pattern và 102 tests Domain | Use case Application, repository, EF Core mapping, migration |
-| Matching API | Route location, `/match`, `/quote`; MongoDB DI | Hiện trả `501`; chưa có geo-query, index, seed, pricing |
+| Matching API | Route location, `/match`, `/quote`; DI persistence cũ, chưa chuyển sang Supabase | Hiện trả `501`; chưa có geo-query, index, seed, pricing |
 | Payment API | `/payments`, `/payments/{id}/refund`; PostgreSQL DI | Hiện trả `501`; chưa có charge, ledger, idempotency, migration |
 | Xử lý lỗi HTTP | `GlobalExceptionHandler` riêng cho bốn ứng dụng; Problem Details, che exception message | Ánh xạ domain exception theo kiểu cụ thể sang `404/409/...` |
 | Phân quyền trong service | Chưa có middleware JWT/resource authorization trong Trip API đã kiểm tra | Kiểm tra chủ chuyến và tài xế được mời/được gán |
@@ -126,8 +128,8 @@ flowchart LR
     Trip -->|"REST: /match, /quote"| Matching
     Trip -->|"REST: /payments\nqua IPaymentClient"| Payment["Payment Service"]
     Trip --> TripDB[("SQL Server: TripDB")]
-    Matching --> MatchDB[("MongoDB: MatchDB")]
-    Payment --> PayDB[("PostgreSQL: PayDB")]
+    Matching --> MatchDB[("Supabase PostgreSQL: matchdb")]
+    Payment --> PayDB[("Supabase PostgreSQL: paydb")]
     Payment --> Mock["Mock Card / Wallet gateway"]
 ```
 
@@ -164,7 +166,7 @@ flowchart TD
     Application --> Domain
 ```
 
-`Api -> Infrastructure` phục vụ composition root/đăng ký DI. Endpoint nhận request -> gọi use case -> trả response. Domain không tham chiếu EF Core, MongoDB, ASP.NET, HTTP hoặc MassTransit. Infrastructure triển khai các port được khai báo ở Application/Domain.
+`Api -> Infrastructure` phục vụ composition root/đăng ký DI. Endpoint nhận request -> gọi use case -> trả response. Domain không tham chiếu EF Core, Supabase PostgreSQL, ASP.NET, HTTP hoặc MassTransit. Infrastructure triển khai các port được khai báo ở Application/Domain.
 
 ### 5.2. Các lớp dự kiến cần tạo
 
@@ -179,7 +181,7 @@ Tên dưới đây là gợi ý để chia việc, chưa có trong source. Có t
 | Trip Infrastructure | `TripRepository`, `MatchingHttpClient`, `PaymentHttpClient`, `PendingPaymentWorker` | EF Core, HTTP có timeout, phục hồi payment đang chờ |
 | Matching Domain | `PricingContext`, `IPricingStrategy`, `StandardPricingStrategy`, các bước giá | Công thức và invariant, không biết `Trip` entity |
 | Matching Application | `UpdateDriverLocation`, `MatchDriver`, `CreateQuote`, `FareCalculator` | Điều phối geo-query, cấu hình giá và lưu quote |
-| Matching Application / Infrastructure | `IDriverLocationRepository` / `MongoDriverLocationRepository`, `IQuoteRepository` / `MongoQuoteRepository` | Truy cập MongoDB qua abstraction |
+| Matching Application / Infrastructure | `IDriverLocationRepository` / `PostgresDriverLocationRepository`, `IQuoteRepository` / `PostgresQuoteRepository` | Truy cập Supabase PostgreSQL qua abstraction |
 | Payment Domain | `Payment`, `Refund`, `LedgerEntry`, `PaymentMethodFactory` | Trạng thái giao dịch, bút toán và lựa chọn Card/Wallet |
 | Payment Application | `ChargePayment`, `RefundPayment`, `IPaymentGateway`, `IPaymentRepository`, `ILedgerWriter` | Kiểm tra key/payload, gọi adapter, chốt kết quả trong transaction |
 | Payment Infrastructure | `PaymentRepository`, `MockCardGateway`, `MockWalletGateway` | PostgreSQL và giả lập gateway, không có giá chuyến |
@@ -201,7 +203,7 @@ src/
   MatchingService/
     Domain/                    # Pricing/, ValueObjects/
     Application/               # UseCases/, Ports/, DTOs/
-    Infrastructure/            # Mongo/, Seed/
+    Infrastructure/            # Persistence/ (Npgsql, matchdb), Seed/
     Api/
   PaymentService/
     Domain/                    # Payments/, Ledger/, PaymentMethods/
@@ -237,18 +239,18 @@ Các cấu trúc sau là **mô hình đề xuất**, chưa phải schema hiện 
 
 `CommandReceipts` phục vụ các command cần gửi lại sau timeout, đặc biệt tạo chuyến và driver-reject: cùng request không tạo thêm chuyến hay tăng bộ đếm thêm lần nữa. Đây là bảng kỹ thuật trong Trip, không phải event sourcing.
 
-### 6.2. MatchDB - MongoDB
+### 6.2. MatchDB - Supabase PostgreSQL, schema `matchdb`
 
-| Collection | Trường chính | Index / quy tắc |
+| Bảng | Trường chính | Index / quy tắc |
 |---|---|---|
-| `driver_locations` | `DriverId`, GeoJSON `Location`, `IsOnline`, `UpdatedAt` | Unique `DriverId`; `2dsphere` trên `Location`; tọa độ lưu `[longitude, latitude]` |
-| `quotes` | `QuoteId`, pricing input snapshot, breakdown, `Amount`, `Currency`, `CreatedAt` | Unique `QuoteId`; tiền dùng decimal/Decimal128, không binary floating point |
+| `driver_locations` | `DriverId`, `Latitude`, `Longitude`, `IsOnline`, `UpdatedAt` | Unique `DriverId`; kiểm tra miền tọa độ; index lọc online/thời điểm cập nhật; PostGIS chỉ bổ sung khi cần |
+| `quotes` | `QuoteId`, pricing input snapshot, breakdown, `Amount`, `Currency`, `CreatedAt` | Unique `QuoteId`; tiền dùng decimal/numeric nguyên đồng, không binary floating point |
 
 Driver cập nhật vị trí bằng upsert. Tọa độ phải đúng miền giá trị; bỏ driver offline hoặc vị trí quá cũ theo cấu hình. Seed dùng ID cố định và upsert, chạy lại không nhân bản dữ liệu.
 
 Quyết định MVP: quote là snapshot của chuyến, không tự hết hạn trong lúc rider đang xác nhận. Nếu thêm TTL sau này, phải bổ sung rõ lỗi quote hết hạn và luồng yêu cầu báo giá lại; không âm thầm đổi giá.
 
-### 6.3. PayDB - PostgreSQL
+### 6.3. PayDB - Supabase PostgreSQL, schema `paydb`
 
 | Bảng | Trường chính | Ràng buộc |
 |---|---|---|
@@ -339,7 +341,7 @@ Candidate lúc `Quoted` chưa được giữ chỗ. Nếu đến lúc xác nhậ
 
 ### 8.1. Các use case
 
-1. `UpdateDriverLocation`: xác thực driver đang cập nhật chính mình, validate tọa độ, upsert vào MongoDB.
+1. `UpdateDriverLocation`: xác thực driver đang cập nhật chính mình, validate tọa độ, upsert vào Supabase PostgreSQL.
 2. `MatchDriver`: tìm driver online, vị trí còn mới, trong bán kính cấu hình và không thuộc danh sách loại. Sắp theo khoảng cách; dùng `DriverId` để phá hòa cho demo/test ổn định.
 3. `CreateQuote`: tạo `PricingContext`, chạy strategy/pipeline, lưu quote snapshot rồi trả DTO. Không cần đọc TripDB.
 
@@ -576,7 +578,7 @@ Các giá trị sau là **đề xuất để khởi đầu demo**, không phải
 | Background scan | Chu kỳ hữu hạn theo cấu hình, claim công việc nguyên tử; dừng graceful bằng cancellation token |
 | Gateway | Hiện cấu hình YARP `ActivityTimeout = 30s`; cần đặt tổng request budget rõ khi tích hợp, không xem đây là timeout tổng tuyệt đối |
 
-Đặt timeout/cancellation cho HTTP, DB connection/command, MongoDB và payment adapter. Chuyển cancellation token xuyên use case/adapter. Sau khi command đã commit phần việc cần phục hồi, client disconnect không được làm mất tiến độ thanh toán.
+Đặt timeout/cancellation cho HTTP, DB connection/command, Supabase PostgreSQL và payment adapter. Chuyển cancellation token xuyên use case/adapter. Sau khi command đã commit phần việc cần phục hồi, client disconnect không được làm mất tiến độ thanh toán.
 
 ### 12.2. Lỗi nào được retry
 
@@ -677,7 +679,7 @@ Mở rộng OpenTelemetry cho HTTP, DB và message; propagate trace context qua 
 
 Giữ `/health` là liveness đúng hiện trạng. Khi cần readiness, thêm kiểm tra dependency riêng; liveness không phụ thuộc tất cả service khác để tránh restart dây chuyền. Mỗi API readiness chỉ cần phản ánh dependency thiết yếu của chính nó.
 
-Tiếp tục dùng Docker Compose và các volume đã có. Bổ sung migration, geo-index, seed theo service và nội bộ HTTP addresses; không đổi công nghệ DB hoặc nâng package chỉ để viết kiến trúc. Không coi `docker compose config` thành công là đã kiểm tra container, DB hay luồng thật.
+Giữ Compose cho ứng dụng và TripDB; chuyển Matching sang Npgsql/EF Core, cấu hình Supabase với schema riêng và TLS cho Matching/Payment. Bổ sung mapping, seed theo service và địa chỉ HTTP nội bộ; MVP chưa cần PostGIS. Không coi `docker compose config` thành công là đã kiểm tra container, DB hay luồng thật.
 
 ## 15. Kết nối giao diện hiện có
 
@@ -734,7 +736,7 @@ Map/tile và UI trình bày có thể giữ nguyên. Khoảng cách/giá mock hi
 | Mã | Quyết định | Lý do / đánh đổi |
 |---|---|---|
 | ADR-01 | Ba business service và một Gateway; không tách thêm | Đúng đề, nhóm nhỏ dễ hoàn thành; Matching/Pricing vẫn tách class bên trong |
-| ADR-02 | Giữ SQL Server/MongoDB/PostgreSQL của repo | Minh họa polyglot persistence; chấp nhận chi phí chạy ba loại DB cho môn học |
+| ADR-02 | Giữ SQL Server và Supabase PostgreSQL của repo | Trip giữ SQL Server; Matching và Payment dùng Supabase, tách schema và quyền theo service |
 | ADR-03 | REST MVP, payment qua `IPaymentClient` | Dễ debug end-to-end; cần xử lý pending/recovery trước khi có broker |
 | ADR-04 | Snapshot giá trong Trip và charge theo snapshot | Giá đã đồng ý không đổi khi policy Matching thay đổi |
 | ADR-05 | Transaction nội bộ + key xuyên retry | Nhất quán trong service, chấp nhận khoảng chờ giữa các service |
@@ -754,7 +756,7 @@ Mỗi hàng có thể trở thành một task hoặc PR nhỏ. Xây theo luồng
 | 01 / BASE-01 | Chốt request/response HTTP, actor identity, command key, error codes, options | Api/Application từng service; HTTP adapter khi có caller | Có contract rõ cho happy/error path; không reference chéo service; chưa cần broker |
 | 02 / TRIP-01 | Trip aggregate, value object và State pattern theo mục 7 | Trip Domain + Trip tests | Tất cả TR-01..TR-17 và invalid transition mỗi state được test |
 | 03 / TRIP-02 | Repository, schema/migration, row version, command receipt, driver assignment constraint | Trip Infrastructure/Application | Create/read/transition được lưu; command retry không lặp tác động; driver không bị giữ bởi hai chuyến |
-| 04 / MATCH-01 | Location API, seed, `2dsphere`, nearest driver | Matching Domain/Application/Infrastructure/Api | Cập nhật đúng chủ driver; seed lặp an toàn; query loại offline/stale/rejected |
+| 04 / MATCH-01 | Location API, seed, lọc online/thời điểm cập nhật và tính khoảng cách, nearest driver | Matching Domain/Application/Infrastructure/Api | Cập nhật đúng chủ driver; seed lặp an toàn; query loại offline/stale/rejected |
 | 05 / PRICE-01 | Pricing strategies, pipeline, options, route estimator demo, quote persistence | Matching Domain/Application/Infrastructure | Đúng công thức/invariant; quote có ID; giá không do client quyết định |
 | 06 / PAY-01 | PaymentMethod Factory, mock gateway có deterministic key | Payment Domain/Application/Infrastructure | Card/Wallet chọn đúng; adapter có timeout, kết quả transient/declined/unknown |
 | 07 / PAY-02 | Charge use case, unique index, transaction, balanced ledger | Payment Application/Infrastructure + tests | Duplicate/concurrent request chỉ một logical charge; conflict không charge; rollback đúng |
@@ -782,7 +784,7 @@ Gợi ý chức năng đầu tiên để bắt đầu code: **TRIP-01**. Đầu 
 | Trip | `k=0`, `k=3`, count tại `k` và `k+1`; duplicate reject không tăng count | Unit Application + DB khi kiểm tra receipt |
 | Trip | Quote đã khóa không đổi khi rematch; actor sai; cancel sau nhận bị chặn | Domain/Application |
 | Trip | Accept/cancel đồng thời; hai chuyến claim cùng driver; replay create cùng key; stale network result không ghi đè state mới | Integration SQL Server + Application |
-| Matching | Tìm gần nhất, không có driver, offline, stale, excluded, tọa độ sai, seed lặp | Unit + MongoDB integration cho geo-index |
+| Matching | Tìm gần nhất, không có driver, offline, stale, excluded, tọa độ sai, seed lặp | Unit + PostgreSQL integration cho upsert và lọc vị trí |
 | Pricing | Ví dụ 74.844 VND; đúng thứ tự toll/promo/tax; boundary và midpoint rounding | xUnit Domain |
 | Pricing | Giá không âm; surge dưới 1; promo bằng 0 hoặc trên 1; tax/rate/distance/time âm | Theory/invariant test cho mọi strategy |
 | Payment | Cùng key/payload nhiều lần chỉ một charge/journal; key khác cùng trip bị chặn | Unit + PostgreSQL integration |
@@ -796,7 +798,7 @@ Gợi ý chức năng đầu tiên để bắt đầu code: **TRIP-01**. Đầu 
 | Messaging | Duplicate event, khác event ID cùng payment key, event out of order, error queue, Outbox restart | Chỉ khi triển khai extension |
 | UI | Hiển thị trạng thái server, refresh, poll dừng, pending/lỗi, không cho client settle | WebApp tests + demo qua Gateway |
 
-Dùng xUnit + Moq như repo. Fake/mock phù hợp cho Domain và timeout branch; constraint unique, transaction, row version và Mongo geospatial cần DB thật để xác minh. Không dùng EF in-memory làm bằng chứng unique index/transaction của PostgreSQL hoặc SQL Server đúng.
+Dùng xUnit + Moq như repo. Fake/mock phù hợp cho Domain và timeout branch; constraint unique, transaction, row version và truy vấn vị trí PostgreSQL cần DB thật để xác minh. Không dùng EF in-memory làm bằng chứng unique index/transaction của PostgreSQL hoặc SQL Server đúng.
 
 ### 18.2. Kịch bản nghiệm thu MVP
 
