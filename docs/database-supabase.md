@@ -1,10 +1,12 @@
 # MatchDB và PayDB trên Supabase
 
+> Cập nhật Matching 28/10/2026: đã triển khai Clean Architecture, Npgsql/schema matchdb, báo giá từ tọa độ và tìm địa chỉ Nominatim. Xem [hướng dẫn hiện hành](matching-pricing.md). Các mô tả scaffold chưa triển khai Matching bên dưới là trạng thái lịch sử.
+
 Ngày triển khai: 26/10/2026. Project: **ATBM HTTT** (`ywcbecxxhktumyqumwdc`).
 
 Theo quyết định của nhóm, Matching và Payment dùng chung PostgreSQL trên Supabase,
 nhưng tách schema và quyền theo service. TripDB do thành viên khác phụ trách, không thay đổi trong lần này.
-Quyết định này thay thế phần MongoDB cho Matching trong thiết kế mục tiêu cũ.
+Đây là quyết định hiện hành cho Matching, thay thế thiết kế database document cũ.
 
 ## Cấu trúc đã triển khai
 
@@ -53,7 +55,7 @@ policy backend không thay thế kiểm tra quyền nghiệp vụ.
 
 ## Phần backend cần làm tiếp
 
-1. Thay MongoDB adapter của Matching bằng PostgreSQL; thêm mapping, repository và seed demo.
+1. Chuyển adapter persistence cũ của Matching sang Npgsql/EF Core cho Supabase PostgreSQL; thêm mapping, repository và seed demo.
    Lọc driver online và vị trí còn mới, loại driver đã từ chối rồi tính khoảng cách trong Matching.
    Bản nhỏ lưu latitude/longitude, chưa có spatial index; thêm PostGIS khi lượng driver đủ lớn để cần geo-query.
 2. Tính giá trong Application/Domain của Matching và lưu snapshot quote, không tính giá bằng trigger.
@@ -65,8 +67,8 @@ policy backend không thay thế kiểm tra quyền nghiệp vụ.
 5. Cấu hình connection string có TLS, connection/command timeout và cancellation.
    Cập nhật Compose, cấu hình service và kiểm thử end-to-end sau khi adapter có thể chạy.
 
-Code .NET và `docker-compose.yml` hiện vẫn dùng cấu hình scaffold cũ (Matching/MongoDB, Payment/PostgreSQL local).
-Lần này chỉ triển khai cấu trúc dữ liệu trên Supabase, chưa chuyển runtime của hai service.
+Adapter Matching và cấu hình Compose của Matching vẫn dùng database cũ, chưa chuyển sang Supabase. Payment trong Compose đã trỏ tới Supabase nhưng mapping EF chưa chỉ định schema `paydb`; Compose vẫn phụ thuộc PostgreSQL local.
+Cấu trúc dữ liệu đã có trên Supabase; chưa xác minh luồng runtime .NET hoàn chỉnh với hai schema.
 Đã bổ sung cấu trúc refund; chưa thêm API/use case refund, Outbox/Inbox, Saga, PostGIS, demo seed hoặc thay đổi TripDB.
 
 ## Hoàn tiền toàn phần

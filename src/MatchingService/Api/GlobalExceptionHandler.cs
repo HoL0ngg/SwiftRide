@@ -9,9 +9,13 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        var statusCode = exception is BadHttpRequestException { StatusCode: >= 400 and < 500 } badRequest
-            ? badRequest.StatusCode
-            : StatusCodes.Status500InternalServerError;
+        var statusCode = exception switch
+        {
+            BadHttpRequestException { StatusCode: >= 400 and < 500 } badRequest => badRequest.StatusCode,
+            Domain.MatchingDomainException => StatusCodes.Status400BadRequest,
+            Application.Geocoding.GeocodingUnavailableException => StatusCodes.Status503ServiceUnavailable,
+            _ => StatusCodes.Status500InternalServerError
+        };
         var traceId = Activity.Current?.Id ?? httpContext.TraceIdentifier;
 
         // Exception messages can contain payment tokens or connection strings.

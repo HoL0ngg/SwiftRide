@@ -33,12 +33,13 @@ services:
       dockerfile: src/MatchingService/Api/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      # URL-encode special characters in MongoDB credentials used in the URI.
-      ConnectionStrings__MatchDB: "mongodb://${MONGO_USERNAME:?Set MONGO_USERNAME}:${MONGO_PASSWORD:?Set MONGO_PASSWORD}@mongodb:27017/MatchDB?authSource=admin&connectTimeoutMS=30000&serverSelectionTimeoutMS=30000&socketTimeoutMS=30000"
-      MongoDB__Database: MatchDB
-    depends_on:
-      mongodb:
-        condition: service_healthy
+      ConnectionStrings__MatchDB: ${ConnectionStrings__MatchDB:?Set Supabase MatchDB connection string}
+      Jwt__Issuer: ${JWT_ISSUER:?Set JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE:?Set JWT_AUDIENCE}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY}
+      Geocoding__SearchUrl: ${GEOCODING_SEARCH_URL:-https://nominatim.openstreetmap.org/search}
+      Geocoding__UserAgent: ${GEOCODING_USER_AGENT:-SwiftRideCourseDemo/1.0}
+      Matching__SeedDemoDrivers: ${MATCHING_SEED_DEMO_DRIVERS:-false}
 
   payment-service:
     build:
@@ -46,7 +47,7 @@ services:
       dockerfile: src/PaymentService/Api/Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ConnectionStrings__PaymentDB: "Host=postgres;Database=PayDB;Username=${POSTGRES_USER:?Set POSTGRES_USER};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD};Timeout=30;Command Timeout=30"
+      ConnectionStrings__PaymentDB: "Host=aws-0-ap-southeast-1.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.ywcbecxxhktumyqumwdc;Password=khFcSN1Spu01De0M;SSL Mode=Disable;Timeout=15;Command Timeout=30"
       Database__MigrateOnStartup: "true"
     depends_on:
       postgres:
@@ -73,34 +74,11 @@ services:
     volumes:
       - trip-data:/var/opt/mssql
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -d TripDB -l 5 -b -Q "SELECT 1" >/dev/null',
-        ]
+      test: [ "CMD-SHELL", '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -d TripDB -l 5 -b -Q "SELECT 1" >/dev/null' ]
       interval: 10s
       timeout: 10s
       retries: 15
       start_period: 30s
-
-  mongodb:
-    image: mongo:8.0
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:?Set MONGO_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?Set MONGO_PASSWORD}
-      MONGO_INITDB_DATABASE: MatchDB
-    volumes:
-      - match-data:/data/db
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          'mongosh --quiet --username "$$MONGO_INITDB_ROOT_USERNAME" --password "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "quit(db.adminCommand({ping:1}).ok ? 0 : 1)"',
-        ]
-      interval: 10s
-      timeout: 10s
-      retries: 10
-      start_period: 20s
 
   postgres:
     image: postgres:17
@@ -111,24 +89,23 @@ services:
     volumes:
       - payment-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d PayDB']
+      test: [ "CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d PayDB' ]
       interval: 10s
       timeout: 5s
       retries: 10
 
   rabbitmq:
     image: rabbitmq:4.1-management
-    profiles: ["messaging"]
+    profiles: [ "messaging" ]
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Set RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 10s
       timeout: 10s
       retries: 10
 
 volumes:
   trip-data:
-  match-data:
   payment-data:

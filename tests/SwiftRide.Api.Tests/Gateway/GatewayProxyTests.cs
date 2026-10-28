@@ -101,6 +101,22 @@ public class GatewayProxyTests
         Assert.Empty(fixture.Trip.Requests);
     }
 
+    [Fact]
+    public async Task AddressSearch_RequiresJwt_AndProxiesOnlyToMatching()
+    {
+        using var logs = new CapturedLogs();
+        await using var fixture = await GatewayFixture.StartAsync(loggerProvider: logs);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await fixture.Client.GetAsync("/locations/search?query=market")).StatusCode);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/locations/search?query=market");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", fixture.CreateToken("rider-1", "rider"));
+        Assert.Equal(HttpStatusCode.NotImplemented, (await fixture.Client.SendAsync(request)).StatusCode);
+        var forwarded = Assert.Single(fixture.Matching.Requests);
+        Assert.Equal("/locations/search", forwarded.Path);
+        Assert.True(forwarded.HasAuthorization);
+        Assert.Empty(fixture.Trip.Requests);
+        Assert.DoesNotContain(logs.Messages, message => message.Contains("query=market", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Theory]
     [InlineData("GET")]
     [InlineData("POST")]

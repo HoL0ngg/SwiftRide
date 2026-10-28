@@ -1,5 +1,7 @@
 # Báo cáo scaffold SwiftRide
 
+> Báo cáo lịch sử, không phải trạng thái hiện hành. Matching và Payment dùng Supabase PostgreSQL với schema riêng; xem [trạng thái chuyển đổi](database-supabase.md). Các package và cấu hình scaffold cũ bên dưới chưa được chuyển đổi toàn bộ.
+
 ## Kết quả
 
 Đã tạo skeleton gồm 17 project: gateway, Contracts, 12 project thuộc đúng ba service và ba test project. Không thêm logic nghiệp vụ, entity, DTO, migration, state machine, pricing, payment, MassTransit, Outbox, Saga hoặc OpenTelemetry.
@@ -24,7 +26,7 @@ docs/requirements.md có sơ đồ gateway tới Payment và phần mô tả mes
 | Target framework | net10.0 |
 | Microsoft.EntityFrameworkCore.SqlServer | 10.0.12 |
 | Npgsql.EntityFrameworkCore.PostgreSQL | 10.0.3 |
-| MongoDB.Driver | 3.12.0 |
+| Adapter persistence Matching cũ, cần thay bằng Npgsql | 3.12.0 (lịch sử scaffold) |
 | Yarp.ReverseProxy | 2.3.0 |
 | Microsoft.AspNetCore.Authentication.JwtBearer | 10.0.12 |
 | xunit | 2.9.3 |
@@ -35,7 +37,7 @@ docs/requirements.md có sơ đồ gateway tới Payment và phần mô tả mes
 
 Các package reference đã được pin phiên bản cụ thể. Không thêm coverlet từ template. Matching Infrastructure dùng FrameworkReference Microsoft.AspNetCore.App cho DI/configuration, không thêm package DI.
 
-Dockerfile dùng mcr.microsoft.com/dotnet/sdk:10.0 và aspnet:10.0. Database image được cấu hình: SQL Server 2022-latest, mongo:8.0, postgres:17; broker tùy chọn rabbitmq:4.1-management. Chưa tải hoặc chạy các image nên chưa xác minh digest/runtime thực tế.
+Dockerfile dùng mcr.microsoft.com/dotnet/sdk:10.0 và aspnet:10.0. Database image được cấu hình: SQL Server 2022-latest, database Matching cũ, postgres:17; broker tùy chọn rabbitmq:4.1-management. Chưa tải hoặc chạy các image nên chưa xác minh digest/runtime thực tế.
 
 ## Lệnh và xác thực
 
@@ -77,9 +79,9 @@ Kiểm tra references: Domain và Contracts không có reference/package; Applic
 
 **Chưa chạy được containers, database healthchecks và HTTP qua gateway trong Docker.** Docker CLI có sẵn nhưng daemon không khả dụng. Local smoke check không thay thế xác thực Docker hoặc kết nối database. Chưa xác minh SQL Server initialization, database persistence hay startup ordering thực tế.
 
-Health endpoints hiện là liveness. Không tự tạo schema/migration; Compose chỉ khởi tạo database TripDB, cấu hình MatchDB và PayDB. MongoDB tạo database vật lý khi có ghi dữ liệu; skeleton chưa ghi dữ liệu.
+Health endpoints hiện là liveness. Không tự tạo schema/migration; Compose chỉ khởi tạo database TripDB, cấu hình MatchDB và PayDB. Tại thời điểm scaffold chưa có dữ liệu Matching; hiện schema `matchdb` đã được tạo trên Supabase.
 
-.env.example chỉ có placeholder; chưa tạo .env hoặc lưu secret thật. Khi chạy local, thay placeholder và URL-encode MongoDB credentials nếu chứa ký tự đặc biệt. Chỉ gateway publish 5080; RabbitMQ nằm trong profile messaging.
+Cấu hình hiện tại cần tách secrets sang environment/user-secrets và bật TLS cho Supabase. Chỉ gateway publish 5080; RabbitMQ nằm trong profile messaging.
 
 ## Bước tiếp theo
 

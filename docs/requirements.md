@@ -93,7 +93,7 @@ Trip Service gọi **Matching and Pricing Service**.
 Dịch vụ này:
 
 - tìm tài xế gần nhất;
-- truy vấn dữ liệu vị trí trên MongoDB;
+- truy vấn dữ liệu vị trí trên Supabase PostgreSQL;
 - tính giá chuyến đi.
 
 ### 4. Rider xác nhận giá
@@ -201,8 +201,8 @@ flowchart LR
     Payment["Payment Service"]
 
     TripDB[("SQL Server<br/>TripDB")]
-    MatchDB[("MongoDB<br/>MatchDB")]
-    PayDB[("PostgreSQL<br/>PayDB")]
+    MatchDB[("Supabase PostgreSQL<br/>matchdb")]
+    PayDB[("Supabase PostgreSQL<br/>paydb")]
 
     MQ[["RabbitMQ"]]
 
@@ -291,17 +291,17 @@ nếu hai giao diện có nhu cầu khác biệt đáng kể.
 
 ---
 
-## 3.3 Ba cơ sở dữ liệu khác nhau
+## 3.3 Dữ liệu tách biệt theo dịch vụ
 
 | Dịch vụ | CSDL | Lý do lựa chọn |
 |---|---|---|
 | Trip Service | SQL Server (quan hệ) | Trạng thái chuyến đi cần ACID, ràng buộc toàn vẹn và transition nhất quán |
-| Matching and Pricing | MongoDB (document) | Dữ liệu vị trí/route/rider/driver linh hoạt, ghi đọc nhanh, hỗ trợ geo-spatial index |
-| Payment Service | PostgreSQL (quan hệ) | Ledger dạng double-entry cần transaction mạnh, kiểm toán và nhất quán dữ liệu tiền bạc |
+| Matching and Pricing | Supabase PostgreSQL, schema `matchdb` | Lưu latitude/longitude và snapshot quote; MVP lọc driver hợp lệ rồi tính khoảng cách trong service |
+| Payment Service | Supabase PostgreSQL, schema `paydb` | Ledger dạng double-entry cần transaction mạnh, kiểm toán và nhất quán dữ liệu tiền bạc |
 
-### Polyglot Persistence
+### Cô lập dữ liệu theo service
 
-Mỗi service chọn CSDL phù hợp nhất với nghiệp vụ thay vì ép toàn hệ thống sử dụng một CSDL.
+Trip giữ SQL Server. Matching và Payment dùng Supabase PostgreSQL nhưng tách schema và quyền theo service, không truy vấn chéo.
 
 Trade-off:
 
@@ -422,7 +422,7 @@ POST /trips/{id}/dropoff
 ### Trách nhiệm
 
 - Tìm tài xế gần nhất.
-- Geo-query trên MongoDB.
+- MVP lọc driver online, vị trí còn mới và driver bị loại trừ rồi tính khoảng cách trong Matching. PostGIS chỉ bổ sung khi cần.
 - Tính giá.
 - Áp dụng Strategy Pattern.
 
@@ -704,7 +704,7 @@ public sealed class CompletedState : TripState
 | Thành phần | Công nghệ đề xuất |
 |---|---|
 | Runtime / Framework | .NET 10 (LTS), ASP.NET Core Minimal API / Controllers |
-| ORM / Data | EF Core 10 cho SQL Server/PostgreSQL, MongoDB.Driver |
+| ORM / Data | EF Core 10 cho SQL Server/PostgreSQL, Npgsql.EntityFrameworkCore.PostgreSQL |
 | API Gateway | YARP |
 | Message Broker | RabbitMQ qua MassTransit |
 | Xác thực | OAuth 2.0 / OpenID Connect, JWT Bearer |
@@ -736,7 +736,7 @@ SwiftRide/
 │   │   ├── Domain/
 │   │   ├── Application/
 │   │   ├── Infrastructure/
-│   │   │   └── # MongoDB
+│   │   │   └── # Supabase PostgreSQL
 │   │   └── Api/
 │   │
 │   └── PaymentService/

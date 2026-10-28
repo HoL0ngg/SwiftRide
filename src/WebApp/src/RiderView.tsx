@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react'
 import {
-  ArrowRight, ArrowUpDown, CarFront, Check, CheckCircle2, ChevronDown,
+  ArrowRight, ArrowUpDown, CarFront, Check, CheckCircle2,
   Clock3, CreditCard, Leaf, LoaderCircle, MapPin, Navigation,
   ShieldCheck, Sparkles, Star, Wallet,
 } from 'lucide-react'
-import { places, useDemo, demoApi, formatMoney } from './demo'
+import { useDemo, demoApi, formatMoney } from './demo'
+import type { Place } from './demo'
+import AddressSearch from './AddressSearch'
 
 const statusCopy: Record<string, { title: string; description: string }> = {
   Quoted: { title: 'Chuyến đi của bạn đã sẵn sàng', description: 'Xem giá và xác nhận để gửi lời mời đến tài xế.' },
@@ -26,10 +28,16 @@ const journeySteps = [
   { label: 'Hoàn tất', states: ['DroppedOff', 'PaymentPending', 'Paid'] },
 ]
 
-export default function RiderView() {
+type Props = {
+  pickup: Place; destination: Place; selection: 'pickup' | 'destination' | null;
+  onChange: (kind: 'pickup' | 'destination', place: Place) => void;
+  onSelectMap: (kind: 'pickup' | 'destination') => void;
+  onSwap: () => void;
+};
+
+export default function RiderView({ pickup, destination, selection, onChange, onSelectMap, onSwap }: Props) {
   const { trip, online } = useDemo()
-  const [pickupId, setPickupId] = useState(places[0]?.id ?? '')
-  const [destinationId, setDestinationId] = useState(places[1]?.id ?? '')
+  const [token, setToken] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'card'>('wallet')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -68,37 +76,17 @@ export default function RiderView() {
           <h2 className="panel-title">Đi đâu cũng<br /><span className="text-emerald-700">thật gần.</span></h2>
           <p className="muted mt-3 max-w-72 text-sm leading-6">Một điểm đến mới, một hành trình êm ái.<br className="hidden sm:block" /> Bắt đầu cùng SwiftRide nhé.</p>
 
-          <form className="mt-7" onSubmit={event => { event.preventDefault(); void run(() => demoApi.quote(pickupId, destinationId, paymentMethod)) }}>
-            <div className="relative rounded-2xl border border-stone-200 bg-[#fafbf9] p-1.5">
-              <div className="pointer-events-none absolute left-[25px] top-[49px] h-10 border-l border-dashed border-stone-300" />
-              <label className="relative flex items-center gap-3 rounded-xl px-3 py-3 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-600">
-                <span className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full border-2 border-emerald-600"><span className="h-1 w-1 rounded-full bg-emerald-600" /></span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[10px] font-semibold uppercase tracking-[.12em] text-stone-400">Điểm đón</span>
-                  <select aria-label="Điểm đón" value={pickupId} onChange={event => setPickupId(event.target.value)} disabled={loading} className="w-full cursor-pointer appearance-none bg-transparent py-1 pr-3 text-sm font-semibold text-stone-800 outline-none">
-                    {places.map(place => <option key={place.id} value={place.id}>{place.name}</option>)}
-                  </select>
-                </span>
-                <ChevronDown size={15} className="shrink-0 text-stone-400" aria-hidden="true" />
-              </label>
-              <div className="ml-10 mr-12 border-t border-stone-200" />
-              <button type="button" aria-label="Đổi điểm đón và điểm đến" disabled={loading} onClick={() => { setPickupId(destinationId); setDestinationId(pickupId) }} className="absolute right-5 top-[60px] z-10 flex h-7 w-7 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 transition hover:border-emerald-600 hover:text-emerald-700"><ArrowUpDown size={13} aria-hidden="true" /></button>
-              <label className="relative flex items-center gap-3 rounded-xl px-3 py-3 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-600">
-                <MapPin size={14} className="-ml-px shrink-0 text-emerald-700" aria-hidden="true" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[10px] font-semibold uppercase tracking-[.12em] text-stone-400">Điểm đến</span>
-                  <select aria-label="Điểm đến" value={destinationId} onChange={event => setDestinationId(event.target.value)} disabled={loading} className="w-full cursor-pointer appearance-none bg-transparent py-1 pr-3 text-sm font-semibold text-stone-800 outline-none">
-                    {places.map(place => <option key={place.id} value={place.id}>{place.name}</option>)}
-                  </select>
-                </span>
-                <ChevronDown size={15} className="shrink-0 text-stone-400" aria-hidden="true" />
-              </label>
+          <form className="mt-7" onSubmit={event => { event.preventDefault(); void run(() => demoApi.quote(pickup, destination, paymentMethod)) }}>
+            <div className="space-y-4 rounded-2xl border border-stone-200 bg-[#fafbf9] p-3">
+              <AddressSearch label="Điểm đón" place={pickup} token={token} disabled={loading} selecting={selection === 'pickup'} onChange={place => onChange('pickup', place)} onSelectMap={() => onSelectMap('pickup')} />
+              <button type="button" aria-label="Đổi điểm đón và điểm đến" disabled={loading} onClick={onSwap} className="flex items-center gap-2 text-[10px] text-stone-500 hover:text-emerald-700"><ArrowUpDown size={13} aria-hidden="true" />Đổi hai điểm</button>
+              <AddressSearch label="Điểm đến" place={destination} token={token} disabled={loading} selecting={selection === 'destination'} onChange={place => onChange('destination', place)} onSelectMap={() => onSelectMap('destination')} />
             </div>
-
-            <div className="mt-3 flex flex-wrap gap-2" aria-label="Điểm đến gợi ý">
-              {places.filter(place => place.id !== pickupId).slice(0, 3).map(place => <button key={place.id} type="button" disabled={loading} onClick={() => setDestinationId(place.id)} className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-medium transition ${destinationId === place.id ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-stone-200 bg-white text-stone-600 hover:border-emerald-300'}`}><MapPin size={11} aria-hidden="true" />{place.name}</button>)}
-            </div>
-
+            <p className="mt-3 text-[10px] leading-5 text-stone-500">Tìm kiếm bằng Nominatim · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline">OpenStreetMap contributors</a>. Hai điểm ban đầu là địa điểm mẫu; kiểm tra trên bản đồ trước khi xem giá.</p>
+            <details className="mt-2 text-[10px] text-stone-500" open={!import.meta.env.DEV}>
+              <summary className="cursor-pointer">{import.meta.env.DEV ? 'Kết nối Gateway (JWT Development tự cấp)' : 'JWT để tìm địa chỉ'}</summary>
+              <label className="mt-2 block">JWT từ hệ thống đăng nhập<input type="password" autoComplete="off" value={token} onChange={event => setToken(event.target.value)} placeholder="Chỉ lưu trong bộ nhớ tab" className="mt-1 w-full rounded-lg border border-stone-200 p-2" /></label>
+            </details>
             <div className="section-divider my-6" />
             <div className="mb-3 flex items-center justify-between"><h2 className="text-xs font-semibold text-stone-700">Thanh toán</h2><span className="text-[10px] text-stone-400">Phương thức mô phỏng</span></div>
             <div className="grid grid-cols-2 gap-2" role="group" aria-label="Phương thức thanh toán">
@@ -107,15 +95,15 @@ export default function RiderView() {
 
             {!online && <p className="mt-4 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">Tài xế đang ngoại tuyến. Chuyển sang giao diện tài xế và bật nhận chuyến để trải nghiệm đặt xe.</p>}
             {error && <p role="alert" className="error-message mt-4">{error}</p>}
-            <button type="submit" disabled={loading || !pickupId || !destinationId || pickupId === destinationId} className="primary-button mt-5 flex w-full items-center justify-center gap-2">{loading ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Navigation size={17} aria-hidden="true" />}<span>{loading ? 'Đang tìm chuyến phù hợp…' : 'Xem giá chuyến đi'}</span>{!loading && <ArrowRight size={17} className="ml-auto" aria-hidden="true" />}</button>
-            {pickupId === destinationId && <p className="mt-2 text-xs text-amber-800">Vui lòng chọn điểm đến khác điểm đón.</p>}
+            <button type="submit" disabled={loading || (pickup.lat === destination.lat && pickup.lng === destination.lng)} className="primary-button mt-5 flex w-full items-center justify-center gap-2">{loading ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Navigation size={17} aria-hidden="true" />}<span>{loading ? 'Đang tìm chuyến phù hợp…' : 'Xem giá chuyến đi'}</span>{!loading && <ArrowRight size={17} className="ml-auto" aria-hidden="true" />}</button>
+            {pickup.lat === destination.lat && pickup.lng === destination.lng && <p className="mt-2 text-xs text-amber-800">Vui lòng chọn điểm đến khác điểm đón.</p>}
           </form>
 
-          <div className="mt-6 flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-700"><Leaf size={18} aria-hidden="true" /></span><div><p className="text-xs font-semibold text-emerald-900">Đi nhẹ nhàng. Đến an tâm.</p><p className="mt-1 text-[11px] leading-5 text-emerald-800/70">Giá rõ ràng trước khi đặt.<br />Điểm đón và điểm đến rõ ràng trên bản đồ.</p></div></div>
+          <p className="mt-3 text-[10px] leading-5 text-stone-500">Giá và thời gian là mô phỏng từ khoảng cách Haversine; chưa phải tuyến đường hoặc báo giá backend.</p><div className="mt-6 flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-700"><Leaf size={18} aria-hidden="true" /></span><div><p className="text-xs font-semibold text-emerald-900">Đi nhẹ nhàng. Đến an tâm.</p><p className="mt-1 text-[11px] leading-5 text-emerald-800/70">Giá rõ ràng trước khi đặt.<br />Điểm đón và điểm đến rõ ràng trên bản đồ.</p></div></div>
         </>
       ) : (
         <>
-          <span className={`status-pill mb-4 inline-flex items-center gap-1.5 ${trip.status === 'Paid' ? 'bg-emerald-100 text-emerald-800' : ''}`}>{trip.status === 'Paid' ? <CheckCircle2 size={13} aria-hidden="true" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}{quoted ? 'GIÁ ƯỚC TÍNH' : terminal ? 'CHUYẾN ĐI ĐÃ KẾT THÚC' : 'CHUYẾN ĐI HIỆN TẠI'}</span>
+          <span className={`status-pill mb-4 inline-flex items-center gap-1.5 ${trip.status === 'Paid' ? 'bg-emerald-100 text-emerald-800' : ''}`}>{trip.status === 'Paid' ? <CheckCircle2 size={13} aria-hidden="true" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}{quoted ? 'GIÁ DEMO ƯỚC TÍNH' : terminal ? 'CHUYẾN ĐI ĐÃ KẾT THÚC' : 'CHUYẾN ĐI HIỆN TẠI'}</span>
           <h2 className="text-[27px] font-semibold leading-[1.35] tracking-[-.04em] text-stone-900">{copy?.title}</h2>
           <p aria-live="polite" className="muted mt-3 text-xs leading-6">{copy?.description}</p>
 

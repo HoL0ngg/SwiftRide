@@ -38,7 +38,7 @@ Do not silently replace the architecture with a different one.
 
 ## 4. Scope: MVP first, extensions later
 
-**MVP (do first):** 3 services + Gateway + 3 databases in `docker-compose.yml`; synchronous REST calls;
+**MVP (do first):** 3 services + Gateway + 3 owned databases/schemas (TripDB plus Supabase schemas `matchdb` and `paydb`); synchronous REST calls;
 trip state machine; pricing strategies; payment with idempotency and ledger; unit tests for domain rules.
 
 **Extensions (only after the MVP works):** RabbitMQ/MassTransit events, DLQ, Transactional Outbox,
@@ -84,9 +84,10 @@ Rules:
 - Any transition not in the table throws a domain exception. Every row needs a unit test, and so does at least one invalid transition per state.
 - The Trip stores `QuoteId`, `FareAmount` and `Currency` as a snapshot of what the rider agreed to.
 
-### 5.2 Matching & Pricing Service — MongoDB
+### 5.2 Matching & Pricing Service — Supabase PostgreSQL
 
-Owns driver locations (GeoJSON + `2dsphere` index), nearest-driver search, and quotes.
+Owns driver locations (latitude/longitude; filter online/fresh drivers and calculate distance in Matching for the MVP), nearest-driver search, and quotes.
+Use explicit schema mapping and separate service credentials; never query `paydb`. PostGIS is optional when scale requires it.
 It needs a way to receive data: expose `PUT /drivers/{id}/location` and provide **seed data** for demos and tests.
 
 Pricing formula (all values configurable, none hard-coded in controllers):
@@ -103,7 +104,7 @@ price = ((costPerKm * distance + costPerMinute * estimatedTime) * surge + toll)
   composable steps/decorators with a documented order. New modes are added without editing existing ones.
 - Invariants: `price >= 0`, `surge >= 1`, `0 < promotionFactor <= 1`, `tax >= 0`. Cover them with tests.
 
-### 5.3 Payment Service — PostgreSQL
+### 5.3 Payment Service — Supabase PostgreSQL (`paydb`)
 
 Owns payments and the **append-only, double-entry ledger** (each settled payment writes balanced debit/credit
 entries in one local transaction). Handles refunds and compensation.
@@ -122,6 +123,7 @@ Public routes (through the Gateway, JWT required):
 | `POST /trips`, `GET /trips/{id}`, `POST /trips/{id}/confirm-quote`, `POST /trips/{id}/cancel` | Rider  |
 | `POST /trips/{id}/driver-accept`, `/driver-reject`, `/en-route`, `/pickup`, `/dropoff`        | Driver |
 | `PUT /drivers/{id}/location`                                                                  | Driver |
+| `GET /locations/search?query=...` | Rider / Driver |
 
 Internal routes (NOT exposed by the Gateway): `POST /match`, `POST /quote` (called by Trip Service),
 `POST /payments`, `POST /payments/{id}/refund` (called by Trip Service or via events).
@@ -163,7 +165,7 @@ SwiftRide/
 
 - **Domain**: entities, value objects, state rules, domain events. No dependency on DB, HTTP, RabbitMQ or frameworks.
 - **Application**: use cases, orchestration, DTO mapping, interfaces. Depends on Domain.
-- **Infrastructure**: EF Core, MongoDB, repositories, MassTransit, payment adapters, migrations. Implements interfaces from Domain/Application.
+- **Infrastructure**: EF Core, Supabase PostgreSQL, repositories, MassTransit, payment adapters, migrations. Implements interfaces from Domain/Application.
 - **Api**: thin controllers/Minimal APIs, request/response contracts, auth configuration.
 - NEVER create a generic `Common` project containing business logic.
 
@@ -193,7 +195,7 @@ Useful metrics: successful trip rate, matching duration, API latency, payment fa
 
 ## 10. Tech stack
 
-.NET 10 (LTS) · ASP.NET Core · EF Core 10 (SQL Server, PostgreSQL) · MongoDB.Driver · YARP · RabbitMQ + MassTransit ·
+.NET 10 (LTS) · ASP.NET Core · EF Core 10 (SQL Server, PostgreSQL) (Npgsql) · YARP · RabbitMQ + MassTransit ·
 Docker / docker-compose · xUnit + Moq · OpenTelemetry. If the repo already uses a nearby supported .NET version, do not upgrade it unprompted.
 Using one DB technology with isolated schemas/databases per service is acceptable for this project.
 

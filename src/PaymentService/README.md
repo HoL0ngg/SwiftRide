@@ -1,5 +1,7 @@
 # Payment Service (SwiftRide)
 
+> Kiến trúc hiện hành dùng Supabase PostgreSQL, schema riêng paydb cho Payment và matchdb cho Matching. Hướng dẫn PostgreSQL local bên dưới mô tả cách chạy cũ; mapping EF chưa chuyển sang paydb. Xem [trạng thái database](../../docs/database-supabase.md).
+
 Service **thanh toán** trong hệ thống SwiftRide.
 
 - Thu tiền cho một chuyến đi, **không tính lại giá** (dùng đúng số tiền Trip gửi sang).
@@ -7,7 +9,7 @@ Service **thanh toán** trong hệ thống SwiftRide.
 - Chống thu tiền 2 lần bằng **Idempotency-Key**.
 - Hoàn tiền bằng bút toán đảo.
 
-Công nghệ: .NET 10, Minimal API, EF Core 10, PostgreSQL 17 (database `PayDB`), Docker.
+Công nghệ: .NET 10, Minimal API, EF Core 10, Supabase PostgreSQL (schema đích `paydb`), Docker.
 
 > Đây là service **nội bộ**: API Gateway không route `/payments`.
 > Khi test, ta gọi thẳng vào cổng `5285`.

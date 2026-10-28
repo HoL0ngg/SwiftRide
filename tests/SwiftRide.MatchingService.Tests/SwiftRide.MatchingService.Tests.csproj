@@ -15,10 +15,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <Using Include="Xunit" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\MatchingService\Infrastructure\SwiftRide.MatchingService.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\MatchingService\Domain\SwiftRide.MatchingService.Domain.csproj" />
     <ProjectReference Include="..\..\src\MatchingService\Application\SwiftRide.MatchingService.Application.csproj" />
   </ItemGroup>

@@ -44,7 +44,8 @@ public sealed class GatewayFixture : IAsyncDisposable
         string environment = "Development",
         bool stallTripResponse = false,
         IReadOnlyDictionary<string, string?>? overrides = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ILoggerProvider? loggerProvider = null)
     {
         UpstreamStub? tripStub = null;
         UpstreamStub? matchingStub = null;
@@ -75,6 +76,7 @@ public sealed class GatewayFixture : IAsyncDisposable
             });
 
             builder.Logging.ClearProviders();
+            if (loggerProvider is not null) builder.Logging.AddProvider(loggerProvider);
             builder.WebHost.UseUrls("http://127.0.0.1:0");
 
             var inMemoryConfig = new Dictionary<string, string?>
