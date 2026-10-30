@@ -1,4 +1,4 @@
-using Moq;
+﻿using Moq;
 using SwiftRide.MatchingService.Application;
 using SwiftRide.MatchingService.Domain;
 
@@ -62,5 +62,34 @@ public class MatchingUseCaseTests
         using var cts = new CancellationTokenSource();
         await new UpdateDriverLocation(locations.Object, clock).ExecuteAsync("driver-1", new(1, 2), true, cts.Token);
         locations.Verify(w => w.UpsertAsync(It.Is<DriverLocation>(l => l.DriverId == "driver-1" && l.UpdatedAt == clock.GetUtcNow()), cts.Token), Times.Once);
+    }
+
+    private sealed class PremiumTestPricingStrategy : IPricingStrategy
+    {
+        public string Mode => "premium";
+        public decimal CalculateBase(PricingContext context)
+        {
+            context.Validate();
+            return (context.CostPerKm * context.DistanceKm + context.CostPerMinute * context.EstimatedMinutes) * 1.5m;
+        }
+    }
+
+    [Fact]
+    public async Task Quote_WithCustomPricingStrategy_CalculatesCorrectlyWithoutModifyingStandardStrategy()
+    {
+        var writer = new Mock<IQuoteWriter>();
+        QuoteSnapshot? saved = null;
+        writer.Setup(w => w.AddAsync(It.IsAny<QuoteSnapshot>(), It.IsAny<CancellationToken>()))
+            .Callback<QuoteSnapshot, CancellationToken>((q, _) => saved = q).Returns(Task.CompletedTask);
+
+        IPricingStrategy[] strategies = [new StandardPricingStrategy(), new PremiumTestPricingStrategy()];
+        var useCase = new CreateQuote(writer.Object, strategies, new(), new Clock());
+
+        var standardResult = await useCase.ExecuteAsync(new(0, 0), new(0, 1), "standard", default);
+        var premiumResult = await useCase.ExecuteAsync(new(0, 0), new(0, 1), "premium", default);
+
+        Assert.NotNull(saved);
+        Assert.True(premiumResult.Amount > standardResult.Amount);
+        Assert.Equal("VND", premiumResult.Currency);
     }
 }

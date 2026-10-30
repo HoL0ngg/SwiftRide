@@ -3,10 +3,13 @@
   <ItemGroup>
     <ProjectReference Include="..\Application\SwiftRide.PaymentService.Application.csproj" />
     <ProjectReference Include="..\Domain\SwiftRide.PaymentService.Domain.csproj" />
+    <ProjectReference Include="..\..\SwiftRide.Contracts\SwiftRide.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageReference Include="MassTransit" Version="8.5.8" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.8" />
   </ItemGroup>
 
   <PropertyGroup>

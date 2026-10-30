@@ -16,6 +16,9 @@ internal abstract class TripState
     public virtual void ConfirmQuote(Trip trip, string riderId, Guid quoteId, string offeredDriverId) =>
         throw new TripDomainException("InvalidTransition", $"Cannot confirm quote in state {Status}.");
 
+    public virtual void ConfirmQuote(Trip trip, string riderId, Guid quoteId) =>
+        throw new TripDomainException("InvalidTransition", $"Cannot confirm quote in state {Status}.");
+
     public virtual void RejectQuote(Trip trip, string riderId) =>
         throw new TripDomainException("InvalidTransition", $"Cannot reject quote in state {Status}.");
 
@@ -48,4 +51,7 @@ internal abstract class TripState
 
     public virtual void RecordPaymentFailure(Trip trip, PaymentFailureKind failureKind) =>
         throw new TripDomainException("InvalidTransition", $"Cannot record payment failure in state {Status}.");
+
+    public virtual void WithdrawOffer(Trip trip) =>
+        throw new TripDomainException("InvalidTransition", $"Cannot withdraw offer in state {Status}.");
 }

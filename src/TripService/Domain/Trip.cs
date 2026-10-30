@@ -73,6 +73,9 @@ public class Trip
     public void ConfirmQuote(string riderId, Guid quoteId, string offeredDriverId) =>
         _state.ConfirmQuote(this, riderId, quoteId, offeredDriverId);
 
+    public void ConfirmQuote(string riderId, Guid quoteId) =>
+        _state.ConfirmQuote(this, riderId, quoteId);
+
     public void RejectQuote(string riderId) =>
         _state.RejectQuote(this, riderId);
 
@@ -84,6 +87,9 @@ public class Trip
 
     public void OfferReplacementDriver(string driverId) =>
         _state.OfferReplacementDriver(this, driverId);
+
+    public void WithdrawOffer() =>
+        _state.WithdrawOffer(this);
 
     public void AcceptDriver(string driverId) =>
         _state.AcceptDriver(this, driverId);
@@ -105,4 +111,95 @@ public class Trip
 
     public void RecordPaymentFailure(PaymentFailureKind failureKind) =>
         _state.RecordPaymentFailure(this, failureKind);
+
+    public TripSnapshot ToSnapshot()
+    {
+        return new TripSnapshot(
+            Id,
+            RiderId,
+            Status,
+            Fare,
+            IsFareLocked,
+            CandidateDriverId,
+            OfferedDriverId,
+            AssignedDriverId,
+            RejectionCount,
+            MaxDriverRejections,
+            _rejectedDriverIds.ToArray(),
+            PaymentIdempotencyKey,
+            PaymentId,
+            LastPaymentFailure
+        );
+    }
+
+    public static Trip Restore(TripSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        if (snapshot.Id == Guid.Empty)
+            throw new TripDomainException("InvalidTripId", "Trip ID cannot be empty.");
+
+        if (string.IsNullOrWhiteSpace(snapshot.RiderId))
+            throw new TripDomainException("InvalidRider", "Rider ID cannot be null or empty.");
+
+        if (snapshot.MaxDriverRejections < 0)
+            throw new TripDomainException("InvalidRejectionLimit", "Max driver rejections must be non-negative.");
+
+        var rejectedList = snapshot.RejectedDriverIds ?? Array.Empty<string>();
+        if (snapshot.RejectionCount < 0 || snapshot.RejectionCount != rejectedList.Count)
+            throw new TripDomainException("InvalidRejectionCount", "Rejection count does not match the rejected drivers list.");
+
+        if (snapshot.IsFareLocked && snapshot.Fare == null)
+            throw new TripDomainException("InvalidFare", "Locked fare must have a quote snapshot.");
+
+        if (snapshot.Status == TripStatus.Paid && !snapshot.PaymentId.HasValue)
+            throw new TripDomainException("InvalidPayment", "Paid trip must have a PaymentId.");
+
+        if (snapshot.Status is TripStatus.DriverAccepted or TripStatus.EnRoute or TripStatus.PickedUp
+            or TripStatus.DroppedOff or TripStatus.PaymentPending or TripStatus.Paid
+            && string.IsNullOrWhiteSpace(snapshot.AssignedDriverId))
+        {
+            throw new TripDomainException("InvalidDriver", "Assigned driver ID is required in accepted/in-progress/terminal paid states.");
+        }
+
+        if (snapshot.Status == TripStatus.Requested && (snapshot.Fare != null || snapshot.IsFareLocked || snapshot.AssignedDriverId != null))
+        {
+            throw new TripDomainException("InvalidState", "Requested trip cannot have locked fare or assigned driver.");
+        }
+
+        if (snapshot.Status == TripStatus.Quoted && (snapshot.Fare == null || snapshot.CandidateDriverId == null || snapshot.IsFareLocked))
+        {
+            throw new TripDomainException("InvalidState", "Quoted trip must have fare and candidate driver, and fare cannot be locked.");
+        }
+
+        if (snapshot.Status == TripStatus.DriverOffered)
+        {
+            if (snapshot.Fare == null || !snapshot.IsFareLocked)
+                throw new TripDomainException("InvalidFare", "DriverOffered trip must have a locked fare.");
+
+            if (snapshot.OfferedDriverId != null && rejectedList.Contains(snapshot.OfferedDriverId))
+                throw new TripDomainException("InvalidDriver", "Offered driver cannot be in rejected drivers list.");
+        }
+
+        var trip = new Trip(snapshot.Id, snapshot.RiderId, snapshot.MaxDriverRejections)
+        {
+            _state = TripStateFactory.Create(snapshot.Status),
+            Fare = snapshot.Fare,
+            IsFareLocked = snapshot.IsFareLocked,
+            CandidateDriverId = snapshot.CandidateDriverId,
+            OfferedDriverId = snapshot.OfferedDriverId,
+            AssignedDriverId = snapshot.AssignedDriverId,
+            RejectionCount = snapshot.RejectionCount,
+            PaymentIdempotencyKey = snapshot.PaymentIdempotencyKey,
+            PaymentId = snapshot.PaymentId,
+            LastPaymentFailure = snapshot.LastPaymentFailure
+        };
+
+        foreach (var rejected in rejectedList)
+        {
+            trip._rejectedDriverIds.Add(rejected);
+        }
+
+        return trip;
+    }
 }

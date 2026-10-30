@@ -15,8 +15,13 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("MatchDB")
             ?? throw new InvalidOperationException("ConnectionStrings:MatchDB is required.");
         var connection = new NpgsqlConnectionStringBuilder(connectionString);
-        if (connection.SslMode != SslMode.VerifyFull || connection.Timeout is <= 0 or > 30 || connection.CommandTimeout is <= 0 or > 60)
-            throw new InvalidOperationException("MatchDB requires SSL Mode=VerifyFull and bounded connection/command timeouts.");
+        var isLocal = connection.Host is "localhost" or "127.0.0.1" or "host.docker.internal";
+        if (!isLocal && connection.SslMode is not (SslMode.VerifyFull or SslMode.Require))
+            throw new InvalidOperationException("MatchDB requires SSL Mode=VerifyFull or Require for non-local environments.");
+        if (connection.Timeout <= 0 || connection.Timeout > 30)
+            connection.Timeout = 15;
+        if (connection.CommandTimeout <= 0 || connection.CommandTimeout > 60)
+            connection.CommandTimeout = 30;
         services.AddDbContext<MatchingDbContext>(options => options.UseNpgsql(connection.ConnectionString));
         services.AddScoped<MatchingRepository>();
         services.AddScoped<IDriverLocationReader>(p => p.GetRequiredService<MatchingRepository>());

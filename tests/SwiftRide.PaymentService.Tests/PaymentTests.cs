@@ -10,7 +10,7 @@ public class PaymentTests
     private static readonly Guid TripId = Guid.NewGuid();
     private const string RiderId = "rider-1", DriverId = "drv-1";
     private static Payment NewPayment() => Payment.Create(TripId, RiderId, DriverId,
-        Money.Create(85_000, "VND"), PaymentMethod.Card, PaymentIdempotency.KeyForTrip(TripId), DateTimeOffset.UtcNow);
+        Money.Create(85_000, "VND"), PaymentMethod.Card, PaymentIdempotency.KeyForTrip(TripId), "tok_card_ok", DateTimeOffset.UtcNow);
 
     [Fact]
     public void MarkSettled_PostsBalancedLedger()
@@ -56,17 +56,25 @@ public class PaymentTests
 
     [Fact]
     public void Refund_BeforeSettled_Throws() =>
-    Assert.Throws<InvalidPaymentStateException>(() => NewPayment().RequestRefund("x", DateTimeOffset.UtcNow));
+        Assert.Throws<InvalidPaymentStateException>(() => NewPayment().RequestRefund("x", DateTimeOffset.UtcNow));
 
     [Fact]
     public void Create_WithKeyOfAnotherTrip_Throws() =>
         Assert.Throws<DomainException>(() => Payment.Create(TripId, RiderId, DriverId,
-            Money.Create(85_000, "VND"), PaymentMethod.Card, PaymentIdempotency.KeyForTrip(Guid.NewGuid()), DateTimeOffset.UtcNow));
+            Money.Create(85_000, "VND"), PaymentMethod.Card, PaymentIdempotency.KeyForTrip(Guid.NewGuid()), "tok_card_ok", DateTimeOffset.UtcNow));
 
     [Theory]
-    [InlineData(0)]
     [InlineData(-5)]
     [InlineData(10.5)]
+    [InlineData(1_000_000_000_000_000_000)]
     public void Money_InvalidAmount_Throws(decimal amount) =>
         Assert.Throws<DomainException>(() => Money.Create(amount, "VND"));
+
+    [Fact]
+    public void Money_ZeroAmount_IsValid()
+    {
+        var m = Money.Create(0, "VND");
+        Assert.Equal(0m, m.Amount);
+        Assert.Equal("VND", m.Currency);
+    }
 }

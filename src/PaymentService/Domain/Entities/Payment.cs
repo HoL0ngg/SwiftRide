@@ -41,7 +41,7 @@ public sealed class Payment
     private Payment() { }
 
     public static Payment Create(Guid tripId, string? riderId, string? driverId, Money amount,
-        PaymentMethod method, string? idempotencyKey, DateTimeOffset now)
+        PaymentMethod method, string? idempotencyKey, string? paymentToken, DateTimeOffset now)
     {
         if (tripId == Guid.Empty)
             throw new DomainException("TripId is required.");
@@ -52,6 +52,9 @@ public sealed class Payment
         if (!Enum.IsDefined(method))
             throw new DomainException("Unsupported payment method.");
         var key = PaymentIdempotency.EnsureValid(idempotencyKey, tripId);
+        var token = (paymentToken ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(token))
+            throw new DomainException("PaymentToken is required.");
 
         return new Payment
         {
@@ -63,7 +66,7 @@ public sealed class Payment
             Method = method,
             Status = PaymentStatus.Pending,
             IdempotencyKey = key,
-            RequestFingerprint = PaymentIdempotency.Fingerprint(tripId, rider, driver, amount, method),
+            RequestFingerprint = PaymentIdempotency.Fingerprint(tripId, rider, driver, amount, method, token),
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -102,12 +105,19 @@ public sealed class Payment
 
     // ---- Hoàn tiền: 2 bước giống thu tiền (tạo ứng viên -> gọi cổng -> chốt) ----
 
-    // Bước 1 (trước khi gọi cổng): kiểm tra luật, tạo Refund Pending trong bộ nhớ
+    // Bước 1 (trước khi gọi cổng): kiểm tra luật, tạo Refund Pending hoặc resume refund cũ
     public Refund RequestRefund(string? reason, DateTimeOffset now)
     {
         EnsureStatus(PaymentStatus.Settled);
         if (_refund is not null)
+        {
+            if (_refund.Status == RefundStatus.Failed)
+            {
+                _refund.ResumePending(now);
+                return _refund;
+            }
             throw new InvalidPaymentStateException("Payment already has a refund.");
+        }
         _refund = Refund.Create(Id, Amount, Refund.NormalizeReason(reason), now);   // hoàn toàn bộ số tiền
         return _refund;
     }
@@ -117,6 +127,20 @@ public sealed class Payment
     {
         var refund = _refund ?? throw new InvalidPaymentStateException("No refund was requested.");
         refund.MarkSettled(gatewayReference, DriverAccount, RiderAccount, now);
+    }
+
+    // Cổng từ chối hoàn tiền: đánh dấu Refund Failed
+    public void FailRefund(string failureCode, DateTimeOffset now)
+    {
+        var refund = _refund ?? throw new InvalidPaymentStateException("No refund was requested.");
+        refund.MarkFailed(failureCode, now);
+    }
+
+    // Khôi phục refund Pending khi retry cùng row
+    public void ResumeRefund(DateTimeOffset now)
+    {
+        var refund = _refund ?? throw new InvalidPaymentStateException("No refund was requested.");
+        refund.ResumePending(now);
     }
 
     // Dùng khi refund đã tồn tại: cùng lý do => replay, khác => 409

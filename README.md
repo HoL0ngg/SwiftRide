@@ -1,121 +1,96 @@
 # SwiftRide
 
-> Cập nhật Matching 28/10/2026: đã triển khai Clean Architecture, Npgsql/schema matchdb, báo giá từ tọa độ và tìm địa chỉ Nominatim. Xem [hướng dẫn hiện hành](docs/matching-pricing.md). Các mô tả scaffold chưa triển khai Matching bên dưới là trạng thái lịch sử.
+> **Trạng thái hệ thống 30/10/2026:** Toàn bộ 18 Task theo kế hoạch Gap Closure đã được hoàn thiện và nghiệm thu toàn diện theo [bản thiết kế kiến trúc](docs/superpowers/specs/2026-10-29-pdf-gap-closure-design.md) và [kế hoạch triển khai chi tiết](docs/superpowers/plans/2026-10-29-pdf-gap-closure.md):
+> - **3 Microservices cốt lõi**: Trip Service (SQL Server `TripDB`), Matching & Pricing Service (Supabase PostgreSQL `matchdb`), Payment Service (Supabase PostgreSQL `paydb`). Tuyệt đối không thêm dịch vụ thứ 4 theo quy tắc `AGENTS.md`.
+> - **API Gateway**: YARP reverse proxy port 5080, xác thực JWT Bearer (hỗ trợ Dual-mode: DevelopmentJwt và OIDC qua PKCE), fixed-window rate limiter, lan truyền W3C `traceparent` và `X-Correlation-Id`.
+> - **Transactional Outbox & Inbox Pattern**: Staging sự kiện nguyên tử trong cùng giao dịch cơ sở dữ liệu cục bộ; Background publishers tự động quét và gửi sang RabbitMQ qua MassTransit 8.5.8.
+> - **Saga Choreography Compensation**: Hỗ trợ bồi hoàn tự động (refund) với sổ cái kế toán kép cân bằng (balanced double-entry ledger).
+> - **OpenTelemetry & Observability**: Giám sát phân tán với OpenTelemetry 1.20.1, core metrics (`trips.created`, `trips.completed`, `matching.duration`, `payments.settled`), tích hợp sẵn Jaeger UI tại cổng 16686.
+> - **Frontend WebApp**: React 19 + TypeScript + Tailwind CSS, tính toán tiền tệ chính xác bằng BigInt whole VND, bản đồ tương tác Leaflet với cơ chế dự phòng tìm kiếm địa chỉ offline (Nominatim fallback).
+> - **Tổng số bài test đạt chuẩn**: **560/560 bài test pass 100%** (bao gồm 90 bài test integration trên 3 database container thật và 104 bài test vitest frontend).
 
-Backend đặt xe cho môn Kiến trúc Phần mềm, dùng .NET 10 và ba service độc lập: Trip (SQL Server), Matching & Pricing (Supabase PostgreSQL, schema `matchdb`), Payment (Supabase PostgreSQL, schema `paydb`). Client đi qua YARP API Gateway.
-
-Hiện tại hệ thống đã hoàn thành:
-1. **API Gateway skeleton**: Composition root chung, routing public/internal, JWT authentication, dev-token boundary, rate limiter và upstream timeout đã kiểm chứng qua automated HTTP tests.
-2. **Trip Domain lifecycle**: Đầy đủ 11 trạng thái với State Pattern, bảo vệ ma trận 17 transitions, bất biến khóa giá, giới hạn từ chối tài xế `k`, sự kiện `RideCompleted` và đối chiếu kết quả thanh toán với 102 unit tests.
-
-Các tầng Application, DB persistence, contract dùng chung và các service Matching/Payment vẫn đang ở dạng skeleton, endpoint nghiệp vụ trả về 501. Chưa có entity EF Core, migration hoặc logic nghiệp vụ cho Matching/Payment.
+Backend đặt xe cho môn Kiến trúc Phần mềm, dùng .NET 10 và ba service độc lập: Trip (SQL Server), Matching & Pricing (Supabase PostgreSQL, schema `matchdb`), Payment (Supabase PostgreSQL, schema `paydb`). Toàn bộ client traffic đi qua YARP API Gateway.
 
 ## Cấu trúc
 
 ```text
 src/
-  ApiGateway/                  # YARP, JWT, fixed-window rate limiter
-  SwiftRide.Contracts/         # Chưa có contract
-  TripService/                 # Domain (State Pattern 11 states), Application, Infrastructure, Api
-  MatchingService/             # Domain, Application, Infrastructure, Api
-  PaymentService/              # Domain, Application, Infrastructure, Api
+  ApiGateway/                  # YARP, JWT Bearer / OIDC, fixed-window rate limiter, Correlation ID
+  SwiftRide.Contracts/         # Integration events contracts V1 (TripAccepted, RideCompleted, PaymentSettled, etc.)
+  TripService/                 # Domain (State Machine), Application, Infrastructure (SQL Server, Outbox), Api
+  MatchingService/             # Domain (Strategy Pricing), Application, Infrastructure (Supabase matchdb), Api
+  PaymentService/              # Domain (Double-Entry Ledger), Application, Infrastructure (Supabase paydb, Inbox), Api
+  WebApp/                      # Frontend Vite + React + TypeScript + Tailwind CSS + oidc-client-ts
 tests/
-  SwiftRide.Api.Tests/
-  SwiftRide.TripService.Tests/
-  SwiftRide.MatchingService.Tests/
-  SwiftRide.PaymentService.Tests/
+  SwiftRide.Api.Tests/         # Gateway routing, security, E2E FullFlow (REST & Events), OIDC, Observability
+  SwiftRide.TripService.Tests/ # Domain lifecycle, UseCase, Persistence (SQL Server), Outbox & Consumer tests
+  SwiftRide.MatchingService.Tests/ # Pricing strategies, geocoding fallback & Postgres repository tests
+  SwiftRide.PaymentService.Tests/  # Domain, Gateway, Ledger, Idempotency, Outbox & Compensation tests
 docs/
-SwiftRide.sln
 docker-compose.yml
+SwiftRide.sln
 ```
 
-Quy tắc kiến trúc: [AGENTS.md](AGENTS.md). Đề bài: [docs/requirements.md](docs/requirements.md). Tài liệu và script kiểm tra: [docs/](docs/).
+Quy tắc kiến trúc: [AGENTS.md](AGENTS.md). Đề bài: [docs/requirements.md](docs/requirements.md). Tài liệu chi tiết: [docs/](docs/).
 
-Tài liệu nền để triển khai chức năng: [docs/architecture.md](docs/architecture.md), gồm ranh giới service, quy tắc nghiệp vụ, API, dữ liệu và lộ trình MVP.
-
-Kế hoạch triển khai chi tiết: [API Gateway skeleton](docs/superpowers/plans/2026-10-19-api-gateway-skeleton.md) và [Trip lifecycle với State Pattern](docs/superpowers/plans/2026-10-19-trip-lifecycle-state-pattern.md). Cả hai kế hoạch đã được thực thi và kiểm chứng hoàn chỉnh bằng automated test suites.
+Tài liệu hệ thống:
+- [Báo cáo Trạng thái Triển khai Toàn diện](docs/implementation-status.md)
+- [Hướng dẫn kiểm thử & Vận hành luồng đặt xe End-to-End](docs/end-to-end-booking.md)
+- [Hợp đồng Integration Event Contracts V1](docs/messaging-contracts-v1.md)
+- [Vận hành RabbitMQ, Error Queue & Replay Poison Message](docs/messaging-operations.md)
+- [Kiến trúc Bảo mật & Cấu hình OIDC Dual-Mode](docs/authentication.md)
+- [Kiến trúc Giám sát OpenTelemetry, Metrics & Tracing](docs/observability.md)
+- [Tài liệu Matching & Pricing Service](docs/matching-pricing.md)
+- [Tài liệu Cơ sở dữ liệu Supabase](docs/database-supabase.md)
+- [Tài liệu Giao diện Frontend](docs/frontend-demo.md)
 
 ## Build và test
 
-Cần .NET 10 SDK trong PATH:
+Cần .NET 10 SDK trong PATH và Node.js 20+ cho WebApp:
 
 ```powershell
+# Kiểm tra phiên bản SDK:
 dotnet --list-sdks
+
+# Khôi phục và build toàn bộ solution:
 dotnet restore SwiftRide.sln
 dotnet build SwiftRide.sln
+
+# Chạy toàn bộ Unit & Functional Tests Backend:
 dotnet test SwiftRide.sln
 
-# Chạy riêng bộ kiểm thử tích hợp Gateway (routing, security, rate limit, timeout):
-dotnet test tests/SwiftRide.Api.Tests/SwiftRide.Api.Tests.csproj --filter FullyQualifiedName~Gateway
+# Chạy kiểm thử tự động toàn diện trên 3 Database thật (SQL Server, matchdb, paydb):
+powershell -File docs/run-integration-tests.ps1 -Suite All
 
-# Chạy riêng bộ kiểm thử Trip Domain (11 states, 17 transitions, fare snapshot, driver rejection):
-dotnet test tests/SwiftRide.TripService.Tests/SwiftRide.TripService.Tests.csproj
+# Chạy kiểm thử Frontend WebApp:
+cd src/WebApp
+npm test
+npm run typecheck
+npm run build
+cd ../..
 ```
-
-Placeholder test của `TripService` đã được xóa và thay bằng 102 unit tests nghiệp vụ. MatchingService và PaymentService vẫn giữ test placeholder `Skeleton_Compiles` cho tới khi có test thật. Runner xUnit được giữ theo sự cho phép của người dùng.
-
-`tests/SwiftRide.Api.Tests` kiểm tra:
-1. `GlobalExceptionHandler`: Xử lý ngoại lệ của cả bốn ứng dụng qua HTTP trong Development và Production, mã lỗi, định dạng JSON và ẩn dữ liệu nhạy cảm.
-2. `Gateway`: Pipeline composition chung, định tuyến public routes (`/trips/**`, `PUT /drivers/{id}/location`), chặn internal routes (`/match`, `/quote`, `/payments/**` -> 404), xác thực JWT, dev-token Development/Production, rate limiter (429) và timeout (504 không replay). Nghiệp vụ backend hiện tại vẫn trả về `501 Not Implemented` từ service stub (chưa có resource authorization và DB persistence).
-
-## Xử lý exception
-
-Mỗi service và Gateway có `GlobalExceptionHandler` riêng tại tầng API, dùng `IExceptionHandler` có sẵn của ASP.NET Core. `Program.cs` đăng ký `AddProblemDetails`, `AddExceptionHandler` và đặt `UseExceptionHandler` trước các middleware/endpoint còn lại.
-
-- `BadHttpRequestException` có mã 4xx giữ nguyên mã HTTP (ví dụ 400 hoặc 413).
-- Exception khác trả 500 với thông báo chung; không gửi exception message hoặc stack trace cho client, kể cả Development.
-- Response có content type `application/problem+json`, các trường `type`, `title`, `status`, `detail`, `traceId`. Log chỉ ghi mã lỗi, tên kiểu exception và `traceId`, tránh lộ token/connection string qua exception message.
-
-Handler chỉ xử lý exception trong HTTP pipeline khi response chưa bắt đầu; không xử lý lỗi cấu hình lúc startup hay lỗi background worker. Các response 401/403/404/429/501 hiện có giữ nguyên hành vi. Chưa có domain exception nên chưa tự ánh xạ lỗi nghiệp vụ thành 404/409; thêm ánh xạ theo kiểu exception cụ thể khi triển khai use case. Lỗi kết nối upstream do YARP chuyển thành response 502/504 không phải exception thoát ra pipeline.
-
-Tham khảo: [xử lý lỗi ASP.NET Core 10](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/error-handling?view=aspnetcore-10.0).
 
 ## Chạy bằng Docker Compose
 
-> Matching và Payment dùng Supabase PostgreSQL với schema riêng. Adapter Matching và Compose chưa hoàn tất chuyển đổi; hướng dẫn scaffold dưới đây chưa bảo đảm chạy được luồng Supabase hoàn chỉnh. Xem [trạng thái database](docs/database-supabase.md).
-
-Cần Docker daemon đang chạy. Tạo cấu hình local rồi thay tất cả password/signing key mẫu:
+Cần Docker daemon đang chạy. Tạo file cấu hình `.env` từ `.env.example`:
 
 ```powershell
 Copy-Item .env.example .env
-docker compose config --quiet
-docker compose up --build -d --wait --wait-timeout 180
-powershell -NoProfile -ExecutionPolicy Bypass -File docs/check-skeleton.ps1
+# Chỉnh sửa mật khẩu và connection strings Supabase trong .env
+
+# Kiểm tra cấu hình compose hợp lệ:
+docker compose --env-file .env config --quiet
+
+# Khởi động toàn bộ stack hệ thống:
+docker compose up --build -d
+```
+
+Sau khi các container khởi động, chạy kịch bản kiểm thử tự động toàn luồng:
+```powershell
+powershell -ExecutionPolicy Bypass -File docs/check-booking-flow.ps1 -GatewayUrl "http://localhost:5080"
+```
+
+Tắt hệ thống:
+```powershell
 docker compose down
 ```
-
-`.env` được git-ignore; không đưa secrets vào Git. Khi đổi thông tin đăng nhập, database volume đã tồn tại không tự cập nhật password. Connection string Supabase dùng Npgsql, TLS, timeout và tài khoản riêng theo service.
-
-Gateway ở `http://localhost:5080`; chỉ gateway publish port. Các service nghe cổng 8080 trong network Compose; mỗi service chỉ phụ thuộc database riêng. Health endpoint của gateway và service là liveness, chưa kiểm tra kết nối database.
-
-Bốn Dockerfile dùng build nhiều giai đoạn và chạy ứng dụng bằng user không phải root (`APP_UID`). Compose dùng sẵn DNS `trip-service:8080` và `matching-service:8080`; chỉ cần đặt các biến địa chỉ khi muốn ghi đè. `ASPNETCORE_ENVIRONMENT` được truyền cho cả Gateway và ba service. Dữ liệu được lưu trong ba named volume; `docker compose down` giữ dữ liệu, tránh dùng `down -v` nếu cần giữ database.
-
-`ASPNETCORE_ENVIRONMENT=Development` mới đăng ký `POST /dev/token?userId=example&role=rider` (hoặc `driver`). Response chứa `access_token`; gửi bằng header `Authorization: Bearer <token>`. Token hết hạn sau 30 phút. Production không có endpoint này; kiểm tra bằng `docs/check-skeleton.ps1 -Production`.
-
-JWT issuer/audience/signing key, cluster addresses và giới hạn request lấy từ cấu hình/environment. Rate limiter dùng một fixed window chung. Gateway chỉ proxy `/trips/**` và `PUT /drivers/{id}/location`, yêu cầu JWT. `/match`, `/quote`, `/payments/**` là nội bộ và trả 404 ở gateway.
-
-RabbitMQ chỉ chạy khi bật profile, chưa có code messaging:
-
-```powershell
-docker compose --profile messaging up --build -d
-docker compose --profile messaging down
-```
-
-## Chạy project trực tiếp
-
-Ví dụ Trip API sau khi cấu hình connection string qua environment:
-
-```powershell
-$env:ConnectionStrings__TripDB = '<connection string của TripDB>'
-dotnet run --project src/TripService/Api/SwiftRide.TripService.Api.csproj
-```
-
-Cấu hình đích: Matching dùng `ConnectionStrings__MatchDB` (Npgsql, schema `matchdb`); Payment dùng `ConnectionStrings__PaymentDB` (schema `paydb`). Adapter Matching hiện chưa chuyển sang PostgreSQL. Gateway cần `Jwt__Issuer`, `Jwt__Audience`, `Jwt__SigningKey`, `RateLimit__PermitLimit`, `RateLimit__WindowSeconds`, `RateLimit__QueueLimit` và hai destination address như trong Compose. Không đưa connection string thật vào tài liệu.
-
-Khi chạy trực tiếp qua `dotnet run --project src/ApiGateway/SwiftRide.ApiGateway.csproj` (launch profile), Gateway mặc định lắng nghe tại `http://localhost:5082`, khác với cổng `http://localhost:5080` khi chạy qua Docker Compose. Rate limiter của Gateway hiện dùng một fixed window chung (`gateway`).
-
-Bước tiếp theo: triển khai MVP bắt đầu từ Trip Domain và test chuyển trạng thái theo AGENTS.md.
-
-## Giao diện rider và driver
-
-`src/WebApp` có hai giao diện Swift Emerald, dùng Vite + React + TypeScript + Tailwind CSS. Bản đồ tải thật từ OpenStreetMap; API, chuyến đi và thanh toán đang mô phỏng trong trình duyệt, chưa kết nối backend. Có thể mở hai tab để trải nghiệm chung một chuyến từ đặt xe đến thanh toán. Xem cách chạy, giới hạn và kịch bản thử tại [docs/frontend-demo.md](docs/frontend-demo.md).
