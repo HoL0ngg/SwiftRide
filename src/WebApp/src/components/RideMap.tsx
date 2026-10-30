@@ -52,15 +52,35 @@ export default function RideMap({ preview, activeTrip, onSelect }: Props = {}) {
   const [tileError, setTileError] = useState(false);
   const [tileAttempt, setTileAttempt] = useState(0);
   const tileTimers = useRef(new Map<HTMLElement, ReturnType<typeof setTimeout>>());
+  const failedTiles = useRef(new Set<HTMLElement>());
 
   function clearTileTimer({ tile }: TileEvent) {
     clearTimeout(tileTimers.current.get(tile));
     tileTimers.current.delete(tile);
   }
 
+  function registerFailure(tile: HTMLElement) {
+    failedTiles.current.add(tile);
+    if (failedTiles.current.size >= 3 || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      setTileError(true);
+    }
+  }
+
+  function registerSuccess(tile: HTMLElement) {
+    failedTiles.current.delete(tile);
+    if (failedTiles.current.size < 3) {
+      setTileError(false);
+    }
+  }
+
   useEffect(() => {
     const timers = tileTimers.current;
-    return () => { timers.forEach(clearTimeout); timers.clear(); };
+    const failures = failedTiles.current;
+    return () => {
+      timers.forEach(clearTimeout);
+      timers.clear();
+      failures.clear();
+    };
   }, []);
 
   return <>
@@ -70,13 +90,22 @@ export default function RideMap({ preview, activeTrip, onSelect }: Props = {}) {
           clearTileTimer(event);
           tileTimers.current.set(event.tile, setTimeout(() => {
             clearTileTimer(event);
-            setTileError(true);
+            registerFailure(event.tile);
             (event.tile as HTMLImageElement).src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
           }, 15000));
         },
-        tileload: clearTileTimer,
-        tileunload: clearTileTimer,
-        tileerror: event => { clearTileTimer(event); setTileError(true); },
+        tileload: event => {
+          clearTileTimer(event);
+          registerSuccess(event.tile);
+        },
+        tileunload: event => {
+          clearTileTimer(event);
+          registerSuccess(event.tile);
+        },
+        tileerror: event => {
+          clearTileTimer(event);
+          registerFailure(event.tile);
+        },
       }} />
       <CircleMarker center={[pickup.lat, pickup.lng]} radius={9} pathOptions={{ color: '#ffffff', weight: 4, fillColor: '#047857', fillOpacity: 1 }}>
         <Tooltip direction="top" permanent offset={[0, -11]}>{trip ? `Đón: ${pickup.name}` : pickup.name}</Tooltip>
@@ -89,6 +118,6 @@ export default function RideMap({ preview, activeTrip, onSelect }: Props = {}) {
       <MapControls pickup={pickup} destination={destination} />
       <MapSelection onSelect={trip ? undefined : onSelect} />
     </MapContainer>
-    {tileError && <div className="map-error" role="status"><MapPin size={16} className="shrink-0" /><span>Một số ô bản đồ chưa tải được. Hãy kiểm tra kết nối mạng.</span><button className="ml-auto shrink-0 rounded border border-amber-300 px-2 py-1 font-semibold" onClick={() => { setTileError(false); setTileAttempt(attempt => attempt + 1); }}>Thử lại</button></div>}
+    {tileError && <div className="map-error" role="status"><MapPin size={16} className="shrink-0" /><span>Một số ô bản đồ chưa tải được. Hãy kiểm tra kết nối mạng.</span><button className="ml-auto shrink-0 rounded border border-amber-300 px-2 py-1 font-semibold" onClick={() => { failedTiles.current.clear(); setTileError(false); setTileAttempt(attempt => attempt + 1); }}>Thử lại</button></div>}
   </>;
 }
