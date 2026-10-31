@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SwiftRide.PaymentService.Domain.Entities;
 using SwiftRide.PaymentService.Domain.Enums;
 using SwiftRide.PaymentService.Infrastructure.Persistence.Converters;
+
 namespace SwiftRide.PaymentService.Infrastructure.Persistence.Configurations;
 
 // paydb.refunds (UNIQUE payment_id) + paydb.refund_ledger_entries (PK refund_id, side)
@@ -21,7 +23,7 @@ public sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
         b.Property(r => r.GatewayReference).HasColumnName("gateway_reference");
         b.Property(r => r.FailureCode).HasColumnName("failure_code");
         b.Property(r => r.CreatedAt).HasColumnName("created_at");
-        b.Property(r => r.UpdatedAt).HasColumnName("updated_at");
+        b.Property(r => r.UpdatedAt).HasColumnName("updated_at").Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
         b.Property(r => r.SettledAt).HasColumnName("settled_at");
         b.OwnsOne(r => r.Amount, m =>
         {

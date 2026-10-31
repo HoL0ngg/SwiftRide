@@ -24,15 +24,34 @@ public class PostgresRepositoryTests
         var cs = new NpgsqlConnectionStringBuilder(connection);
         Assert.Contains(cs.Host, new[] { "localhost", "127.0.0.1" });
         Assert.Equal("matching_test", cs.Database);
-        await using var db = new MatchingDbContext(new DbContextOptionsBuilder<MatchingDbContext>().UseNpgsql(connection).Options);
-        await using var transaction = await db.Database.BeginTransactionAsync();
+
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "SwiftRide.sln"))) root = root.Parent;
         var sql = await File.ReadAllTextAsync(Path.Combine(root!.FullName, "database/supabase/matchdb-paydb.sql"));
         var start = sql.IndexOf("create table matchdb.driver_locations", StringComparison.Ordinal);
         var end = sql.IndexOf("create table paydb.payments", StringComparison.Ordinal);
-        await db.Database.ExecuteSqlRawAsync("create schema matchdb;");
-        await db.Database.ExecuteSqlRawAsync(sql[start..end]);
+
+        await using (var conn = new NpgsqlConnection(connection))
+        {
+            await conn.OpenAsync();
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "CREATE SCHEMA IF NOT EXISTS matchdb;";
+            await cmd.ExecuteNonQueryAsync();
+
+            try
+            {
+                cmd.CommandText = sql[start..end];
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (PostgresException ex) when (ex.SqlState == "42P07") { }
+        }
+
+        await using var db = new MatchingDbContext(new DbContextOptionsBuilder<MatchingDbContext>().UseNpgsql(connection).Options);
+        await using var transaction = await db.Database.BeginTransactionAsync();
+
+        await db.DriverLocations.ExecuteDeleteAsync();
+        await db.Quotes.ExecuteDeleteAsync();
+
         var repository = new MatchingRepository(db);
         var now = DateTimeOffset.UtcNow;
         await repository.UpsertAsync(new("driver-1", new(10, 106), true, now), default);

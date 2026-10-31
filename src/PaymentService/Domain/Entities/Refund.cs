@@ -60,7 +60,34 @@ public sealed class Refund
         GatewayReference = gatewayReference;
         SettledAt = now;                  // DB: (status='settled') = (settled_at IS NOT NULL)
         UpdatedAt = now;
-        _ledgerEntries.Add(RefundLedgerEntry.Create(Id, debitAccount, EntryDirection.Debit, Amount.Copy(), now));
-        _ledgerEntries.Add(RefundLedgerEntry.Create(Id, creditAccount, EntryDirection.Credit, Amount.Copy(), now));
+        if (_ledgerEntries.Count == 0)
+        {
+            _ledgerEntries.Add(RefundLedgerEntry.Create(Id, debitAccount, EntryDirection.Debit, Amount.Copy(), now));
+            _ledgerEntries.Add(RefundLedgerEntry.Create(Id, creditAccount, EntryDirection.Credit, Amount.Copy(), now));
+        }
+    }
+
+    // Pending -> Failed
+    internal void MarkFailed(string failureCode, DateTimeOffset now)
+    {
+        if (Status != RefundStatus.Pending)
+            throw new InvalidPaymentStateException($"Refund must be Pending but is {Status}.");
+        if (string.IsNullOrWhiteSpace(failureCode))
+            throw new DomainException("Failure code is required.");
+
+        Status = RefundStatus.Failed;
+        FailureCode = failureCode;
+        UpdatedAt = now;
+    }
+
+    // Failed/Pending -> Pending để resume/retry trên cùng row
+    internal void ResumePending(DateTimeOffset now)
+    {
+        if (Status != RefundStatus.Failed && Status != RefundStatus.Pending)
+            throw new InvalidPaymentStateException($"Cannot resume refund from status {Status}.");
+
+        Status = RefundStatus.Pending;
+        FailureCode = null;
+        UpdatedAt = now;
     }
 }

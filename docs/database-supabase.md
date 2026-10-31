@@ -71,26 +71,27 @@ Adapter Matching và cấu hình Compose của Matching vẫn dùng database cũ
 Cấu trúc dữ liệu đã có trên Supabase; chưa xác minh luồng runtime .NET hoàn chỉnh với hai schema.
 Đã bổ sung cấu trúc refund; chưa thêm API/use case refund, Outbox/Inbox, Saga, PostGIS, demo seed hoặc thay đổi TripDB.
 
-## Hoàn tiền toàn phần
+## Hoàn tiền toàn phần & Hardening
 
-Migration `swiftride_paydb_full_refunds` áp dụng sau migration khởi tạo,
+Migration `swiftride_paydb_full_refunds` và [paydb-refund-processing.sql](../database/supabase/paydb-refund-processing.sql) đã được áp dụng và kiểm chứng qua test suite `RefundRecoveryTests`.
 SQL lưu ở [paydb-refunds.sql](../database/supabase/paydb-refunds.sql).
 Hai bảng mới chỉ cấp quyền cho `swiftride_payment`, bật RLS và không cấp quyền cho client.
 
 - Chỉ hoàn payment đã `settled`; amount/currency phải bằng khoản thu gốc. Chưa hỗ trợ hoàn một phần.
 - `UNIQUE(payment_id)` giới hạn một logical refund cho mỗi payment.
 - Khóa cố định `payment-{paymentId}-refund`; retry dùng lại bản ghi và khóa đó.
-- Backend phải so sánh fingerprint: cùng key/cùng payload trả kết quả cũ, khác payload trả conflict.
-  Unique constraint không tự gọi gateway hoặc xử lý replay HTTP.
-- Trạng thái `pending`, `failed`, `settled`. Failed có thể thử lại trên cùng bản ghi;
-  số lần thử, backoff và giới hạn retry cần được thực hiện khi xây use case backend.
+- Backend so sánh fingerprint: cùng key/cùng payload trả kết quả cũ (replay idempotent), khác payload trả conflict 409.
+
+- Trạng thái `pending`, `failed`, `settled`. Failed hoặc Pending sau sự cố gateway được retry/resume nguyên tử trên cùng bản ghi; bảo đảm không bao giờ sinh duplicate refund hay duplicate ledger entries.
+
 - Khi gateway xác nhận hoàn tiền, cập nhật refund thành settled và thêm hai refund ledger entries
   trong cùng local transaction. Debit hoàn tiền dùng tài khoản credit của charge và ngược lại;
   tiền/currency phải khớp. Pending/failed không được có refund ledger.
 - Payload refund và kết quả settled bất biến. Payment gốc vẫn settled, không xóa hoặc đổi trạng thái
   lịch sử thu tiền; xác định đã hoàn tiền bằng refund settled liên kết với payment.
 - `reason` lưu mã lý do an toàn, ví dụ `trip_invalidated`, không đưa thông tin nhạy cảm vào trường này.
-- Mock gateway cũng cần idempotency bền vững cho refund. Không gọi external gateway trong một DB transaction kéo dài.
+- Mock gateway chia sẻ operation store bảo đảm idempotency bền vững cho cả charge và refund (`payment-{id}-refund`).
+- EF Core context cấu hình `updated_at` ignore after save (do trigger quản lý), cấm sửa settled refund, và giải quyết race condition để đúng 1 winner tiến hành settlement trong khi các request đồng thời khác replay an toàn.
 
 `matchdb` chưa cần thêm bảng: `driver_locations` và `quotes` đủ cho luồng MVP và không sở hữu refund.
 Thông tin phân công/từ chối chuyến thuộc Trip; Matching nhận danh sách driver cần loại trừ qua contract.

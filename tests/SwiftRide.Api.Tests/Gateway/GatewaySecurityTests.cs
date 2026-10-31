@@ -108,19 +108,17 @@ public class GatewaySecurityTests
     [Fact]
     public async Task Production_DoesNotExposeDevToken()
     {
-        await using var fixture = await GatewayFixture.StartAsync(environment: "Production");
+        var overrides = new Dictionary<string, string?>
+        {
+            ["Authentication:Mode"] = "Oidc",
+            ["Authentication:Authority"] = "https://identity.swiftride.test",
+            ["Authentication:Audience"] = "swiftride-api",
+            ["Authentication:MetadataTimeoutSeconds"] = "2"
+        };
+        await using var fixture = await GatewayFixture.StartAsync(environment: "Production", overrides: overrides);
 
         using var devResponse = await fixture.Client.PostAsync("/dev/token?userId=rider-1&role=rider", null);
         Assert.Equal(HttpStatusCode.NotFound, devResponse.StatusCode);
-
-        // JWT created locally still works on public route
-        var token = fixture.CreateToken("rider-1", "rider");
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/trips");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        using var response = await fixture.Client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.NotImplemented, response.StatusCode);
-        Assert.NotEmpty(fixture.Trip.Requests);
     }
 
     private static string CreateCustomToken(

@@ -14,12 +14,14 @@ public sealed record Money   // record = so sánh theo giá trị, đúng bản 
 
     public Money Copy() => new() { Amount = Amount, Currency = Currency };
 
+    public static Money Zero => new() { Amount = 0m, Currency = Vnd };
+
     public static Money Create(decimal amount, string? currency)
     {
         if (!string.Equals(currency, Vnd, StringComparison.Ordinal))
             throw new DomainException("Only VND is supported.");
-        if (amount <= 0)
-            throw new DomainException("Amount must be greater than zero.");
+        if (amount < 0m)
+            throw new DomainException("Amount must be greater than or equal to zero.");
         if (decimal.Truncate(amount) != amount)
             throw new DomainException("VND amounts must be whole numbers.");
         if (amount >= MaxExclusive)

@@ -46,6 +46,11 @@ internal sealed class DriverOfferedState : TripState
         trip.SetOfferedDriver(driverId);
     }
 
+    public override void WithdrawOffer(Trip trip)
+    {
+        trip.SetOfferedDriver(null);
+    }
+
     public override void FailNoDriverAvailable(Trip trip)
     {
         if (!trip.IsRematchPending)

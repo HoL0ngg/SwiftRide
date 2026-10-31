@@ -118,12 +118,12 @@ entries in one local transaction). Handles refunds and compensation.
 
 Public routes (through the Gateway, JWT required):
 
-| Route                                                                                         | Caller |
-| --------------------------------------------------------------------------------------------- | ------ |
-| `POST /trips`, `GET /trips/{id}`, `POST /trips/{id}/confirm-quote`, `POST /trips/{id}/cancel` | Rider  |
-| `POST /trips/{id}/driver-accept`, `/driver-reject`, `/en-route`, `/pickup`, `/dropoff`        | Driver |
-| `PUT /drivers/{id}/location`                                                                  | Driver |
-| `GET /locations/search?query=...` | Rider / Driver |
+| Route                                                                                         | Caller         |
+| --------------------------------------------------------------------------------------------- | -------------- |
+| `POST /trips`, `GET /trips/{id}`, `POST /trips/{id}/confirm-quote`, `POST /trips/{id}/cancel` | Rider          |
+| `POST /trips/{id}/driver-accept`, `/driver-reject`, `/en-route`, `/pickup`, `/dropoff`        | Driver         |
+| `PUT /drivers/{id}/location`                                                                  | Driver         |
+| `GET /locations/search?query=...`                                                             | Rider / Driver |
 
 Internal routes (NOT exposed by the Gateway): `POST /match`, `POST /quote` (called by Trip Service),
 `POST /payments`, `POST /payments/{id}/refund` (called by Trip Service or via events).
@@ -235,3 +235,9 @@ keeps side effects idempotent, builds, passes relevant tests, and updates docs w
 Do not generate skills up front. Add one under `.agents/skills/<name>/SKILL.md` only after the code exists and a
 workflow keeps repeating (likely candidates: `trip-domain`, `payment-reliability`, `messaging-outbox-saga`, `testing-dotnet`).
 Each skill needs YAML frontmatter (`name`, `description`) and must not duplicate this file.
+
+## 15. Git & Version Control
+
+- **DO NOT run `git commit` or `git push` automatically.**
+- Always leave changes uncommitted in the working tree for the user to review, verify, and commit manually.
+- When creating implementation plans or executing tasks, skip any automatic git commit steps.

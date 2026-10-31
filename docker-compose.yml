@@ -23,6 +23,18 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ConnectionStrings__TripDB: "Server=sqlserver;Database=TripDB;User Id=sa;Password=${SQLSERVER_PASSWORD:?Set SQLSERVER_PASSWORD};TrustServerCertificate=True;Connect Timeout=30"
+      Jwt__Issuer: ${JWT_ISSUER:?Set JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE:?Set JWT_AUDIENCE}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY}
+      Services__Matching__BaseAddress: ${MATCHING_SERVICE_ADDRESS:-http://matching-service:8080/}
+      Services__Matching__ApiKey: ${INTERNAL_MATCHING_API_KEY:?Set INTERNAL_MATCHING_API_KEY}
+      Services__Payment__BaseAddress: ${PAYMENT_SERVICE_ADDRESS:-http://payment-service:8080/}
+      Services__Payment__ApiKey: ${INTERNAL_PAYMENT_API_KEY:?Set INTERNAL_PAYMENT_API_KEY}
+      Database__MigrateOnStartup: "true"
+      Messaging__Transport: ${MESSAGING_TRANSPORT:-None}
+      RabbitMQ__Host: ${RABBITMQ_HOST:-}
+      RabbitMQ__Username: ${RABBITMQ_USER:-guest}
+      RabbitMQ__Password: ${RABBITMQ_PASSWORD:-guest}
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -37,6 +49,7 @@ services:
       Jwt__Issuer: ${JWT_ISSUER:?Set JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE:?Set JWT_AUDIENCE}
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY}
+      Security__InternalApiKey: ${INTERNAL_MATCHING_API_KEY:?Set INTERNAL_MATCHING_API_KEY}
       Geocoding__SearchUrl: ${GEOCODING_SEARCH_URL:-https://nominatim.openstreetmap.org/search}
       Geocoding__UserAgent: ${GEOCODING_USER_AGENT:-SwiftRideCourseDemo/1.0}
       Matching__SeedDemoDrivers: ${MATCHING_SEED_DEMO_DRIVERS:-false}
@@ -48,10 +61,11 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ConnectionStrings__PaymentDB: ${ConnectionStrings__PaymentDB:?Set Supabase PaymentDB connection string}
-      Database__MigrateOnStartup: "true"
-    depends_on:
-      postgres:
-        condition: service_healthy
+      Security__InternalApiKey: ${INTERNAL_PAYMENT_API_KEY:?Set INTERNAL_PAYMENT_API_KEY}
+      Messaging__Transport: ${MESSAGING_TRANSPORT:-None}
+      RabbitMQ__Host: ${RABBITMQ_HOST:-}
+      RabbitMQ__Username: ${RABBITMQ_USER:-guest}
+      RabbitMQ__Password: ${RABBITMQ_PASSWORD:-guest}
 
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -80,26 +94,16 @@ services:
       retries: 15
       start_period: 30s
 
-  postgres:
-    image: postgres:17
-    environment:
-      POSTGRES_DB: PayDB
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
-    volumes:
-      - payment-data:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d PayDB' ]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   rabbitmq:
     image: rabbitmq:4.1-management
     profiles: [ "messaging" ]
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Set RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}
+    volumes:
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
       test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 10s
@@ -108,4 +112,4 @@ services:
 
 volumes:
   trip-data:
-  payment-data:
+  rabbitmq-data:

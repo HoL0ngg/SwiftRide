@@ -22,12 +22,13 @@ public class MatchingApiTests
     public async Task Real_jwt_ownership_validation_quote_and_search_contracts()
     {
         const string signingKey = "test-only-matching-signing-key-at-least-32-bytes";
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Production" });
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:MatchDB"] = "Host=localhost;Database=unused;Username=unused;Password=unused;SSL Mode=VerifyFull;Timeout=15;Command Timeout=30",
+            ["Security:InternalApiKey"] = "test-internal-matching-key",
             ["Jwt:Issuer"] = "matching-tests", ["Jwt:Audience"] = "matching-tests", ["Jwt:SigningKey"] = signingKey
         });
         var store = new MemoryStore();
@@ -56,6 +57,7 @@ public class MatchingApiTests
         Assert.Single(store.Locations);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync("/drivers/driver-1/location", new { longitude = 1, isOnline = true })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync("/drivers/driver-1/location", new { latitude = 91, longitude = 1, isOnline = true })).StatusCode);
+        client.DefaultRequestHeaders.Add("X-Internal-Api-Key", "test-internal-matching-key");
         var match = await client.PostAsJsonAsync("/match", new { latitude = 10.77, longitude = 106.7 });
         Assert.Equal("driver-1", (await match.Content.ReadFromJsonAsync<MatchResult>())!.Candidate!.DriverId);
         var quote = await client.PostAsJsonAsync("/quote", new { pickup = new { latitude = 10.77, longitude = 106.7 }, destination = new { latitude = 10.78, longitude = 106.71 } });
