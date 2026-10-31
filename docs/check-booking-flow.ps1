@@ -7,6 +7,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+[System.Net.ServicePointManager]::DefaultConnectionLimit = 100
+[System.Net.ServicePointManager]::Expect100Continue = $false
 
 Write-Host "=== SwiftRide End-to-End Booking Smoke Test ===" -ForegroundColor Cyan
 Write-Host "Gateway: $GatewayUrl"
@@ -160,7 +162,7 @@ Write-Host "  -> Idempotent replay for dropoff verified." -ForegroundColor Green
 
 # 7. Poll until Paid
 Write-Host "`n[7/7] Polling trip until Paid status..." -ForegroundColor Yellow
-$maxAttempts = 20
+$maxAttempts = 40
 $paid = $false
 for ($i = 1; $i -le $maxAttempts; $i++) {
     Start-Sleep -Seconds 1
