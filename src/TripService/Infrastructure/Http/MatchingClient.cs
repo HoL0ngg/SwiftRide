@@ -44,7 +44,7 @@ public sealed class MatchingClient : IMatchingClient
         while (true)
         {
             attempts++;
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
             try
@@ -145,7 +145,7 @@ public sealed class MatchingClient : IMatchingClient
             mode = input.Mode
         };
 
-        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
         try
