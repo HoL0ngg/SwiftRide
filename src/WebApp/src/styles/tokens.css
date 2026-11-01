@@ -1,0 +1,55 @@
+/*
+ * Sky Calm design tokens.
+ * Rider uses the light sky-blue scale; the Driver app overrides the brand scale
+ * through [data-app="driver"] on <html> so the two apps are recognisable at a glance.
+ * `static` makes Tailwind emit every variable, because components.css reads them directly.
+ */
+@theme static {
+  --font-sans: 'Be Vietnam Pro', system-ui, sans-serif;
+
+  --color-brand-50: #f5f9ff;
+  --color-brand-100: #e0ebfa;
+  --color-brand-200: #c3d8f7;
+  --color-brand-300: #93bbf9;
+  --color-brand-400: #60a0fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+
+  --color-ink-900: #12294a;
+  --color-ink-700: #2c4468;
+  --color-ink-500: #5b7090;
+  --color-ink-300: #98a9c2;
+
+  --color-surface: #ffffff;
+  --color-canvas: #f5f9ff;
+  --color-line: #e0ebfa;
+
+  --color-accent: #ff9f43;
+  --color-accent-soft: #fff3e3;
+  --color-success: #16a34a;
+  --color-success-soft: #e8f8ee;
+  --color-warning: #d97706;
+  --color-warning-soft: #fff6e0;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fdecec;
+
+  --color-bar: #0f2347;
+
+  --radius-card: 24px;
+  --radius-control: 16px;
+
+  --shadow-float: 0 12px 40px -12px rgb(30 64 140 / 0.28), 0 2px 8px rgb(30 64 140 / 0.06);
+  --shadow-soft: 0 4px 16px -6px rgb(30 64 140 / 0.18);
+}
+
+[data-app='driver'] {
+  --color-brand-50: #f3f6fc;
+  --color-brand-100: #dde5f5;
+  --color-brand-200: #bfcdeb;
+  --color-brand-300: #8fa7da;
+  --color-brand-400: #5f7fc8;
+  --color-brand-500: #1e40af;
+  --color-brand-600: #1e3a8a;
+  --color-brand-700: #172e6e;
+}

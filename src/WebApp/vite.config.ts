@@ -12,6 +12,17 @@ export default defineConfig(({ mode }) => {
   };
   return {
     plugins: [react(), tailwindcss()],
+    // Multi-page app: `/` (role chooser), `/rider/` and `/driver/` are separate entries.
+    appType: 'mpa' as const,
+    build: {
+      rollupOptions: {
+        input: {
+          landing: 'index.html',
+          rider: 'rider/index.html',
+          driver: 'driver/index.html',
+        },
+      },
+    },
     server: {
       proxy: {
         '/locations': gateway,

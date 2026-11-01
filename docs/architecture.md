@@ -72,7 +72,7 @@ Trong tài liệu này:
 | Contracts | Project `SwiftRide.Contracts` | Chưa có integration event; dành cho giai đoạn messaging |
 | Compose | Gateway + ba service + ba DB; RabbitMQ theo profile `messaging` | Chưa có cấu hình HTTP client Trip gọi Matching/Payment hoặc worker xử lý nghiệp vụ |
 | Kiểm thử | Test HTTP cho exception handler; test placeholder cho ba service | Test nghiệp vụ và integration cho các ràng buộc DB quan trọng |
-| WebApp | React/TypeScript, UI rider/driver, bản đồ, luồng demo trong `src/WebApp/src/demo.ts` | Chưa gọi backend; trạng thái, giá và thanh toán còn mô phỏng bằng localStorage |
+| WebApp | React/TypeScript, hai giao diện tách biệt `/rider/` và `/driver/` (Vite multi-page), bản đồ Leaflet | Gọi backend qua API Gateway (Vite proxy); chi tiết ở [frontend-demo.md](frontend-demo.md) và [frontend-design.md](frontend-design.md) |
 
 **Những khác biệt cần xử lý khi triển khai:**
 
@@ -683,7 +683,7 @@ Giữ Compose cho ứng dụng và TripDB; chuyển Matching sang Npgsql/EF Core
 
 ## 15. Kết nối giao diện hiện có
 
-`src/WebApp/src/demo.ts` hiện kiêm mock API, giữ state và phát cập nhật giữa các tab. Giữ giao diện và tách lớp truy cập dữ liệu để thay phần mock bằng HTTP qua Gateway; không đưa logic backend vào React.
+WebApp truy cập dữ liệu qua lớp `services/` (HTTP tới Gateway) và `store/` (polling trạng thái chuyến). Mỗi ứng dụng (`RiderApp`, `DriverApp`) chỉ tạo một store cho đúng vai trò; không đưa logic backend vào React.
 
 | Hành vi demo hiện có | Khi kết nối backend |
 |---|---|

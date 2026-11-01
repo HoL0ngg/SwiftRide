@@ -5,15 +5,19 @@ import type { AuthSession } from '../services/auth';
 interface AuthStatusProps {
   session: AuthSession;
   onLoginRequest?: () => void;
+  /** Use on dark bars (driver topbar). */
+  inverted?: boolean;
 }
 
-export default function AuthStatus({ session, onLoginRequest }: AuthStatusProps) {
+export default function AuthStatus({ session, onLoginRequest, inverted = false }: AuthStatusProps) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => session.isAuthenticated());
   const [actor, setActor] = useState(() => session.getActor());
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const mode = session.getAuthMode();
+  const tone = inverted ? 'pill' : 'pill pill-info';
+  const toneStyle = inverted ? { background: 'rgb(255 255 255 / 0.14)', color: '#fff' } : undefined;
 
   useEffect(() => {
     const unsubscribe = session.onAuthStateChanged(isAuth => {
@@ -58,53 +62,47 @@ export default function AuthStatus({ session, onLoginRequest }: AuthStatusProps)
   }
 
   return (
-    <div className="flex items-center gap-2 text-xs">
+    <div className="hide-on-mobile" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       {mode === 'oidc' ? (
-        <div className="flex items-center gap-2">
-          {isAuthenticated ? (
-            <div className="flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-emerald-800">
-              <ShieldCheck size={14} className="text-emerald-600" />
-              <span>
-                <strong>{actor.userId}</strong> ({actor.role})
-              </span>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                disabled={isProcessing}
-                className="ml-1 inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 shadow-xs hover:bg-rose-50"
-                title="Đăng xuất khỏi OIDC IdP"
-              >
-                <LogOut size={11} />
-                Đăng xuất
-              </button>
-            </div>
-          ) : (
+        isAuthenticated ? (
+          <span className={tone} style={toneStyle}>
+            <ShieldCheck size={14} aria-hidden="true" />
+            <span>
+              <strong>{actor.userId}</strong> ({actor.role})
+            </span>
             <button
               type="button"
-              onClick={handleSignIn}
+              onClick={handleSignOut}
               disabled={isProcessing}
-              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1 font-medium text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+              className="chip-btn"
+              style={{ minHeight: 28, padding: '0 10px', fontSize: 12 }}
+              title="Đăng xuất khỏi OIDC IdP"
             >
-              <LogIn size={13} />
-              {isProcessing ? 'Đang chuyển hướng...' : 'Đăng nhập OIDC'}
+              <LogOut size={12} aria-hidden="true" />
+              Đăng xuất
             </button>
-          )}
-        </div>
+          </span>
+        ) : (
+          <button type="button" onClick={handleSignIn} disabled={isProcessing} className="btn btn-primary btn-sm">
+            <LogIn size={15} aria-hidden="true" />
+            {isProcessing ? 'Đang chuyển hướng...' : 'Đăng nhập OIDC'}
+          </button>
+        )
       ) : (
-        <span
-          className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-stone-100 px-2.5 py-1 font-mono text-[10px] text-stone-600"
-          title="Chế độ phát triển sử dụng JWT dev-token tự sinh"
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          Dev Token ({actor.role})
+        <span className={tone} style={toneStyle} title="Chế độ phát triển sử dụng JWT dev-token tự sinh">
+          <span
+            aria-hidden="true"
+            style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }}
+          />
+          Dev token · {actor.role}
         </span>
       )}
 
       {error && (
-        <div className="inline-flex items-center gap-1 text-[11px] text-rose-600" title={error}>
-          <ShieldAlert size={13} />
-          <span className="max-w-[150px] truncate">{error}</span>
-        </div>
+        <span className="pill pill-danger" title={error}>
+          <ShieldAlert size={14} aria-hidden="true" />
+          <span style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{error}</span>
+        </span>
       )}
     </div>
   );

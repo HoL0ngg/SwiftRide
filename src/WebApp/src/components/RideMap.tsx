@@ -13,6 +13,15 @@ export const defaultHcmCenter: Place = {
   lng: 106.7009,
 };
 
+// Plain OpenStreetMap tiles need no API key (CARTO's free basemaps now show an "API KEY REQUIRED"
+// watermark). components.css softens their colours so the map sits well with the Sky Calm palette.
+export const MAP_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+export const MAP_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors';
+
+// Leaflet path options cannot read CSS variables; these mirror brand-500, accent and bar in tokens.css.
+const MARKER_COLORS = { pickup: '#3b82f6', destination: '#ff9f43', driver: '#0f2347' };
+
 export function MapControls({ pickup, destination }: { pickup: Place; destination?: Place }) {
   const map = useMap();
   function recenter() {
@@ -42,13 +51,18 @@ function MapSelection({ onSelect }: { onSelect?: (place: Place) => void }) {
 type Props = {
   preview?: { pickup: Place; destination: Place };
   activeTrip?: { pickup: Place; destination: Place } | null;
+  /** Where the map centres when there is no trip or preview (for example the driver's own position). */
+  focus?: Place;
+  /** Draws the driver's own marker. */
+  driver?: { lat: number; lng: number; label?: string };
   onSelect?: (place: Place) => void;
 };
 
-export default function RideMap({ preview, activeTrip, onSelect }: Props = {}) {
+export default function RideMap({ preview, activeTrip, focus, driver, onSelect }: Props = {}) {
   const trip = activeTrip !== undefined ? activeTrip : preview;
-  const pickup = trip?.pickup ?? preview?.pickup ?? defaultHcmCenter;
-  const destination = trip?.destination ?? preview?.destination;
+  const route = trip ?? preview;
+  const pickup = route?.pickup ?? focus ?? defaultHcmCenter;
+  const destination = route?.destination;
   const [tileError, setTileError] = useState(false);
   const [tileAttempt, setTileAttempt] = useState(0);
   const tileTimers = useRef(new Map<HTMLElement, ReturnType<typeof setTimeout>>());
@@ -85,7 +99,7 @@ export default function RideMap({ preview, activeTrip, onSelect }: Props = {}) {
 
   return <>
     <MapContainer center={[pickup.lat, pickup.lng]} zoom={14} scrollWheelZoom={false} className="ride-map" zoomControl={true}>
-      <TileLayer key={tileAttempt} url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors' maxZoom={19} eventHandlers={{
+      <TileLayer key={tileAttempt} url={MAP_TILE_URL} attribution={MAP_ATTRIBUTION} maxZoom={19} eventHandlers={{
         tileloadstart: event => {
           clearTileTimer(event);
           tileTimers.current.set(event.tile, setTimeout(() => {
@@ -107,12 +121,19 @@ export default function RideMap({ preview, activeTrip, onSelect }: Props = {}) {
           registerFailure(event.tile);
         },
       }} />
-      <CircleMarker center={[pickup.lat, pickup.lng]} radius={9} pathOptions={{ color: '#ffffff', weight: 4, fillColor: '#047857', fillOpacity: 1 }}>
-        <Tooltip direction="top" permanent offset={[0, -11]}>{trip ? `Đón: ${pickup.name}` : pickup.name}</Tooltip>
-      </CircleMarker>
+      {route && (
+        <CircleMarker center={[pickup.lat, pickup.lng]} radius={10} pathOptions={{ color: '#ffffff', weight: 4, fillColor: MARKER_COLORS.pickup, fillOpacity: 1 }}>
+          <Tooltip direction="top" permanent offset={[0, -12]}>{trip ? `Đón: ${pickup.name}` : pickup.name}</Tooltip>
+        </CircleMarker>
+      )}
       {destination && (
-        <CircleMarker center={[destination.lat, destination.lng]} radius={9} pathOptions={{ color: '#ffffff', weight: 4, fillColor: '#f59e0b', fillOpacity: 1 }}>
-          <Tooltip direction="top" permanent offset={[0, -11]}>Đến: {destination.name}</Tooltip>
+        <CircleMarker center={[destination.lat, destination.lng]} radius={10} pathOptions={{ color: '#ffffff', weight: 4, fillColor: MARKER_COLORS.destination, fillOpacity: 1 }}>
+          <Tooltip direction="top" permanent offset={[0, -12]}>Đến: {destination.name}</Tooltip>
+        </CircleMarker>
+      )}
+      {driver && (
+        <CircleMarker center={[driver.lat, driver.lng]} radius={11} pathOptions={{ color: '#ffffff', weight: 4, fillColor: MARKER_COLORS.driver, fillOpacity: 1 }}>
+          <Tooltip direction="top" permanent offset={[0, -13]}>{driver.label ?? 'Vị trí của bạn'}</Tooltip>
         </CircleMarker>
       )}
       <MapControls pickup={pickup} destination={destination} />

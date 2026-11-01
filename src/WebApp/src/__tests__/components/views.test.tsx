@@ -4,7 +4,6 @@ import type { TripResponse, TripStatus } from '../../types/tripTypes';
 import type { Place } from '../../types/place';
 import type { TripState, TripStore } from '../../store/tripStore';
 import { createAuthSession } from '../../services/auth';
-import type { TripApi } from '../../services/tripApi';
 import RiderView from '../../components/RiderView';
 import DriverView from '../../components/DriverView';
 
@@ -74,8 +73,6 @@ function createMockStore(trip: TripResponse | null = null, history: TripResponse
 
 const mockSession = createAuthSession({ userId: 'rider-1', role: 'rider' });
 mockSession.setToken('test-token');
-
-const mockApi = {} as TripApi;
 
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const buttons = (html: string) => Array.from(html.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g), match => text(match[1]));
@@ -186,7 +183,7 @@ describe('payment state is visible to both roles', () => {
   it('keeps PaymentPending distinct from a paid trip in driver view', () => {
     const store = createMockStore(mockTrip('PaymentPending'));
     const html = renderToStaticMarkup(
-      <DriverView store={store} api={mockApi} driverId="driver-1" />
+      <DriverView store={store} online />
     );
     expect(text(html)).toContain('Đang xử lý thanh toán');
     expect(text(html)).not.toContain('Đã thanh toán');
@@ -198,7 +195,7 @@ describe('driver actions and completed trip totals', () => {
   it('shows acceptance and rejection only while a driver offer is waiting', () => {
     const store = createMockStore(mockTrip('DriverOffered'));
     const actions = buttons(renderToStaticMarkup(
-      <DriverView store={store} api={mockApi} driverId="driver-1" />
+      <DriverView store={store} online />
     ));
     expect(actions).toContain('Nhận chuyến');
     expect(actions).toContain('Từ chối');
@@ -214,7 +211,7 @@ describe('driver actions and completed trip totals', () => {
   ] as const)('shows only the next lifecycle action for %s', (status, expected) => {
     const store = createMockStore(mockTrip(status));
     const actions = buttons(renderToStaticMarkup(
-      <DriverView store={store} api={mockApi} driverId="driver-1" />
+      <DriverView store={store} online />
     ));
     const lifecycle = ['Bắt đầu đến đón', 'Đã đón khách', 'Đã trả khách', 'Nhận chuyến', 'Từ chối'];
     expect(actions.filter(action => lifecycle.includes(action))).toEqual([expected]);
@@ -229,7 +226,7 @@ describe('driver actions and completed trip totals', () => {
     ];
     const store = createMockStore(null, history);
     const content = text(renderToStaticMarkup(
-      <DriverView store={store} api={mockApi} driverId="driver-1" />
+      <DriverView store={store} online />
     ));
     expect(content).toMatch(/Chuyến hoàn tất\s+2\s+chuyến/);
     expect(content).toContain('125.000 ₫');

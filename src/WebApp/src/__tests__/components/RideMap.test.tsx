@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import RideMap, { MapControls } from '../../components/RideMap';
+import RideMap, { MAP_TILE_URL, MapControls } from '../../components/RideMap';
 import { DomEvent } from 'leaflet';
 
 vi.mock('leaflet', () => ({ DomEvent: { disableClickPropagation: vi.fn() } }));
@@ -70,9 +70,45 @@ describe('OpenStreetMap tiles', () => {
   });
 
   it('uses real OpenStreetMap tiles and credits the contributors', () => {
+    expect(captured.tiles?.url).toBe(MAP_TILE_URL);
     expect(captured.tiles?.url).toBe('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
     expect(captured.tiles?.attribution).toContain('OpenStreetMap');
     expect(captured.tiles?.attribution).toContain('https://www.openstreetmap.org/copyright');
+  });
+
+  it('draws no pickup marker until there is a route to show', () => {
+    captured.markers = [];
+    renderToStaticMarkup(<RideMap />);
+    expect(captured.markers).toEqual([]);
+  });
+
+  it('draws only the driver marker, centred on the driver, when idle', () => {
+    captured.markers = [];
+    const focus = { id: 'd', name: 'Vị trí của bạn', address: '', lat: 10.78, lng: 106.7 };
+    const html = renderToStaticMarkup(<RideMap focus={focus} driver={{ lat: focus.lat, lng: focus.lng }} />);
+    expect(captured.markers).toEqual([[10.78, 106.7]]);
+    expect(html).toContain('Vị trí của bạn');
+  });
+
+  it('keeps the driver marker alongside the pickup and destination of a trip', () => {
+    captured.markers = [];
+    const activeTrip = {
+      pickup: { id: 'p', name: 'Pickup', address: 'A', lat: 21, lng: 105 },
+      destination: { id: 'd', name: 'Destination', address: 'B', lat: 21.1, lng: 105.1 },
+    };
+    renderToStaticMarkup(<RideMap activeTrip={activeTrip} driver={{ lat: 21.05, lng: 105.05 }} />);
+    expect(captured.markers).toEqual([[21, 105], [21.1, 105.1], [21.05, 105.05]]);
+  });
+
+  it('does not let a map click move the driver once a trip is active', () => {
+    const select = vi.fn();
+    const activeTrip = {
+      pickup: { id: 'p', name: 'Pickup', address: 'A', lat: 21, lng: 105 },
+      destination: { id: 'd', name: 'Destination', address: 'B', lat: 21.1, lng: 105.1 },
+    };
+    renderToStaticMarkup(<RideMap activeTrip={activeTrip} onSelect={select} />);
+    captured.click!({ latlng: { wrap: () => ({ lat: 21.03, lng: 105.84 }) } });
+    expect(select).not.toHaveBeenCalled();
   });
 
   it('cancels a stalled tile after 15 seconds', () => {

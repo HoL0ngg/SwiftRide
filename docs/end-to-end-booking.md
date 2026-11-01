@@ -98,11 +98,11 @@ Runner tự động khởi động test containers, khởi tạo schema, chạy 
    npm install
    npm run dev
    ```
-2. Mở trình duyệt tại `http://localhost:5173`.
+2. Mở trình duyệt tại `http://localhost:5173/rider/` (hành khách) và `http://localhost:5173/driver/` (tài xế).
 3. Mở 2 tab hoặc 2 cửa sổ:
    - **Tab 1 (Rider):** Nhập điểm đón (Chợ Bến Thành) và điểm đến (Landmark 81). Nhấn "Đặt xe".
-   - **Tab 2 (Driver):** Bật công tắc "Online". Tab sẽ tự động gửi tọa độ heartbeat mỗi 5 giây.
-4. Tab Rider xác nhận cước -> Tab Driver nhận được chuyến trong Driver Feed -> Nhấn "Chấp nhận".
+   - **Tab 2 (Driver):** Bật công tắc "Trực tuyến" và bấm lên bản đồ để chọn vị trí gần điểm đón. Tab gửi tọa độ ngay và lặp lại mỗi 30 giây.
+4. Tab Rider xác nhận cước -> Tab Driver nhận được chuyến trong Driver Feed -> Nhấn "Nhận chuyến".
 5. Driver tiến hành các bước "Đang đến đón", "Đã đón khách", "Hoàn thành chuyến đi".
 6. Màn hình Rider lập tức cập nhật sang trạng thái "Đã thanh toán" kèm thông tin giao dịch mà không cần bấm thủ công.
 
