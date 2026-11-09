@@ -179,12 +179,13 @@ public class ContractSerializationTests
     [Fact]
     public void EventTopology_Constants_MatchSpecifications()
     {
-        Assert.Equal("swiftride.v1.ride-completed", EventTopology.Exchanges.RideCompleted);
-        Assert.Equal("swiftride.v1.payment-settled", EventTopology.Exchanges.PaymentSettled);
-        Assert.Equal("swiftride.v1.payment-failed", EventTopology.Exchanges.PaymentFailed);
-        Assert.Equal("swiftride.v1.payment-compensation-requested", EventTopology.Exchanges.PaymentCompensationRequested);
-        Assert.Equal("swiftride.v1.payment-refunded", EventTopology.Exchanges.PaymentRefunded);
-        Assert.Equal("swiftride.v1.payment-compensation-failed", EventTopology.Exchanges.PaymentCompensationFailed);
+        Assert.Equal("SwiftRide.Contracts.V1:TripAcceptedV1", EventTopology.Exchanges.TripAccepted);
+        Assert.Equal("SwiftRide.Contracts.V1:RideCompletedV1", EventTopology.Exchanges.RideCompleted);
+        Assert.Equal("SwiftRide.Contracts.V1:PaymentSettledV1", EventTopology.Exchanges.PaymentSettled);
+        Assert.Equal("SwiftRide.Contracts.V1:PaymentFailedV1", EventTopology.Exchanges.PaymentFailed);
+        Assert.Equal("SwiftRide.Contracts.V1:PaymentCompensationRequestedV1", EventTopology.Exchanges.PaymentCompensationRequested);
+        Assert.Equal("SwiftRide.Contracts.V1:PaymentRefundedV1", EventTopology.Exchanges.PaymentRefunded);
+        Assert.Equal("SwiftRide.Contracts.V1:PaymentCompensationFailedV1", EventTopology.Exchanges.PaymentCompensationFailed);
 
         Assert.Equal("payment-ride-completed", EventTopology.Queues.PaymentRideCompleted);
         Assert.Equal("trip-payment-settled", EventTopology.Queues.TripPaymentSettled);
@@ -192,5 +193,37 @@ public class ContractSerializationTests
         Assert.Equal("payment-compensation", EventTopology.Queues.PaymentCompensation);
         Assert.Equal("trip-payment-refunded", EventTopology.Queues.TripPaymentRefunded);
         Assert.Equal("trip-payment-compensation-failed", EventTopology.Queues.TripPaymentCompensationFailed);
+    }
+
+    [Fact]
+    public void BootstrapTopology_RoutesMassTransitEvents_WhenConsumersHaveNotStarted()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "SwiftRide.sln"))) root = root.Parent;
+        Assert.NotNull(root);
+        using var definitions = JsonDocument.Parse(File.ReadAllText(Path.Combine(root.FullName, "infra/rabbitmq/definitions.json")));
+        var topology = definitions.RootElement;
+        var routes = new[]
+        {
+            (typeof(RideCompletedV1), EventTopology.Queues.PaymentRideCompleted),
+            (typeof(PaymentSettledV1), EventTopology.Queues.TripPaymentSettled),
+            (typeof(PaymentFailedV1), EventTopology.Queues.TripPaymentFailed),
+            (typeof(PaymentCompensationRequestedV1), EventTopology.Queues.PaymentCompensation),
+            (typeof(PaymentRefundedV1), EventTopology.Queues.TripPaymentRefunded),
+            (typeof(PaymentCompensationFailedV1), EventTopology.Queues.TripPaymentCompensationFailed)
+        };
+
+        foreach (var (messageType, queue) in routes)
+        {
+            var exchange = $"{messageType.Namespace}:{messageType.Name}";
+            Assert.Contains(topology.GetProperty("exchanges").EnumerateArray(), e =>
+                e.GetProperty("name").GetString() == exchange && e.GetProperty("durable").GetBoolean());
+            Assert.Contains(topology.GetProperty("queues").EnumerateArray(), q =>
+                q.GetProperty("name").GetString() == queue && q.GetProperty("durable").GetBoolean());
+            Assert.Contains(topology.GetProperty("bindings").EnumerateArray(), b =>
+                b.GetProperty("source").GetString() == exchange &&
+                b.GetProperty("destination").GetString() == queue &&
+                b.GetProperty("destination_type").GetString() == "queue");
+        }
     }
 }

@@ -81,6 +81,65 @@ describe('tripStore', () => {
     store.stopPolling();
   });
 
+  it('loads the final trip and retains payment success until the rider starts a new booking', async () => {
+    const pendingTrip: TripResponse = { ...sampleTrip, status: 'PaymentPending' };
+    const paidTrip: TripResponse = { ...pendingTrip, status: 'Paid', fareAmount: '136035', currency: 'VND' };
+    vi.mocked(mockApi.getCurrentTrip).mockResolvedValueOnce(pendingTrip);
+    vi.mocked(mockApi.getTripById).mockResolvedValue(paidTrip);
+    const store = createTripStore(mockApi, { userId: 'rider-1', role: 'rider' });
+
+    store.startPolling();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(store.getState().trip?.status).toBe('PaymentPending');
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(mockApi.getTripById).toHaveBeenCalledWith('t-1');
+    expect(store.getState().trip).toEqual(paidTrip);
+
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(store.getState().trip).toEqual(paidTrip);
+    expect(mockApi.getTripById).toHaveBeenCalledTimes(1);
+
+    store.clearTrip();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(store.getState().trip).toBeNull();
+    expect(mockApi.getTripById).toHaveBeenCalledTimes(1);
+    store.stopPolling();
+  });
+
+  it('does not infer payment success when the final trip request fails', async () => {
+    const pendingTrip: TripResponse = { ...sampleTrip, status: 'PaymentPending' };
+    vi.mocked(mockApi.getCurrentTrip).mockResolvedValueOnce(pendingTrip);
+    vi.mocked(mockApi.getTripById).mockRejectedValue(new Error('Network error'));
+    const store = createTripStore(mockApi, { userId: 'rider-1', role: 'rider' });
+
+    store.startPolling();
+    await vi.advanceTimersByTimeAsync(10);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(store.getState().trip).toEqual(pendingTrip);
+    expect(store.getState().error).toContain('Network error');
+    store.stopPolling();
+  });
+
+  it.each(['clear', 'switch actor'])('ignores final trip responses after the rider chooses to %s', async action => {
+    const pendingTrip: TripResponse = { ...sampleTrip, status: 'PaymentPending' };
+    let resolveFinalTrip!: (trip: TripResponse) => void;
+    vi.mocked(mockApi.getCurrentTrip).mockResolvedValueOnce(pendingTrip);
+    vi.mocked(mockApi.getTripById).mockImplementation(() => new Promise(resolve => { resolveFinalTrip = resolve; }));
+    const store = createTripStore(mockApi, { userId: 'rider-1', role: 'rider' });
+
+    store.startPolling();
+    await vi.advanceTimersByTimeAsync(10);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(mockApi.getTripById).toHaveBeenCalledWith('t-1');
+    if (action === 'clear') store.clearTrip();
+    else store.setActor({ userId: 'driver-1', role: 'driver' });
+    resolveFinalTrip({ ...pendingTrip, status: 'Paid' });
+    await vi.advanceTimersByTimeAsync(10);
+    expect(store.getState().trip).toBeNull();
+    store.stopPolling();
+  });
+
   it('clears a completed trip without restoring it from an in-flight poll', async () => {
     const paidTrip: TripResponse = { ...sampleTrip, status: 'Paid' };
     let resolveStalePoll!: (trip: TripResponse | null) => void;

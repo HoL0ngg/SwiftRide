@@ -102,23 +102,23 @@ Phát ra khi việc bồi hoàn gặp lỗi không thể tự động xử lý:
 
 ## 3. RabbitMQ Topology: Exchanges, Queues và Bindings
 
-Cấu hình bootstrap định sẵn tại `infra/rabbitmq/definitions.json` và `infra/rabbitmq/rabbitmq.conf`.
+Topology định sẵn tại `infra/rabbitmq/definitions.json`; healthcheck Compose import sau khi broker tạo user và trước khi đánh dấu healthy. Tên exchange khớp topology mặc định của MassTransit để giữ message khi consumer chưa chạy.
 
 | Exchange Name (Topic/Fanout Durable) | Queue Name (Durable) | Mục đích / Consumer |
 |:---|:---|:---|
-| `swiftride.v1.ride-completed` | `payment-ride-completed` | PaymentService nhận lệnh thu tiền tự động |
-| `swiftride.v1.payment-settled` | `trip-payment-settled` | TripService cập nhật chuyến đi sang `Paid` |
-| `swiftride.v1.payment-failed` | `trip-payment-failed` | TripService ghi nhận lỗi thanh toán |
-| `swiftride.v1.payment-compensation-requested` | `payment-compensation` | PaymentService thực hiện hoàn tiền (`Refund`) |
-| `swiftride.v1.payment-refunded` | `trip-payment-refunded` | TripService xác nhận hoàn tiền thành công |
-| `swiftride.v1.payment-compensation-failed` | `trip-payment-compensation-failed` | TripService cảnh báo bồi hoàn thất bại |
-| `swiftride.v1.trip-accepted` | *(Tùy chọn consumer)* | Broadcast sự kiện tài xế nhận chuyến |
+| `SwiftRide.Contracts.V1:RideCompletedV1` | `payment-ride-completed` | PaymentService nhận lệnh thu tiền tự động |
+| `SwiftRide.Contracts.V1:PaymentSettledV1` | `trip-payment-settled` | TripService cập nhật chuyến đi sang `Paid` |
+| `SwiftRide.Contracts.V1:PaymentFailedV1` | `trip-payment-failed` | TripService ghi nhận lỗi thanh toán |
+| `SwiftRide.Contracts.V1:PaymentCompensationRequestedV1` | `payment-compensation` | PaymentService thực hiện hoàn tiền (`Refund`) |
+| `SwiftRide.Contracts.V1:PaymentRefundedV1` | `trip-payment-refunded` | TripService xác nhận hoàn tiền thành công |
+| `SwiftRide.Contracts.V1:PaymentCompensationFailedV1` | `trip-payment-compensation-failed` | TripService cảnh báo bồi hoàn thất bại |
+| `SwiftRide.Contracts.V1:TripAcceptedV1` | *(Tùy chọn consumer)* | Broadcast sự kiện tài xế nhận chuyến |
 
 ---
 
 ## 4. Kiểm thử Tự động
 
-File kiểm thử `tests/SwiftRide.Api.Tests/Messaging/ContractSerializationTests.cs` (6 tests) đã kiểm chứng:
+File kiểm thử `tests/SwiftRide.Api.Tests/Messaging/ContractSerializationTests.cs` (7 tests) đã kiểm chứng:
 1. Serialization & Deserialization round-trip đầy đủ 7 events.
 2. Giữ trọn độ chính xác của `Guid`, `DateTimeOffset` UTC, `decimal` tiền tệ VND.
 3. Không làm rò rỉ các domain types hay persistence entity models vào contracts.

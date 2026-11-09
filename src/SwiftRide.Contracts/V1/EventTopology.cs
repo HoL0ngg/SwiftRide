@@ -4,13 +4,13 @@ public static class EventTopology
 {
     public static class Exchanges
     {
-        public const string TripAccepted = "swiftride.v1.trip-accepted";
-        public const string RideCompleted = "swiftride.v1.ride-completed";
-        public const string PaymentSettled = "swiftride.v1.payment-settled";
-        public const string PaymentFailed = "swiftride.v1.payment-failed";
-        public const string PaymentCompensationRequested = "swiftride.v1.payment-compensation-requested";
-        public const string PaymentRefunded = "swiftride.v1.payment-refunded";
-        public const string PaymentCompensationFailed = "swiftride.v1.payment-compensation-failed";
+        public const string TripAccepted = "SwiftRide.Contracts.V1:TripAcceptedV1";
+        public const string RideCompleted = "SwiftRide.Contracts.V1:RideCompletedV1";
+        public const string PaymentSettled = "SwiftRide.Contracts.V1:PaymentSettledV1";
+        public const string PaymentFailed = "SwiftRide.Contracts.V1:PaymentFailedV1";
+        public const string PaymentCompensationRequested = "SwiftRide.Contracts.V1:PaymentCompensationRequestedV1";
+        public const string PaymentRefunded = "SwiftRide.Contracts.V1:PaymentRefundedV1";
+        public const string PaymentCompensationFailed = "SwiftRide.Contracts.V1:PaymentCompensationFailedV1";
     }
 
     public static class Queues

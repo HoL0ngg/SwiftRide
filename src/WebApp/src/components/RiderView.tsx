@@ -284,7 +284,7 @@ export default function RiderView({
             </StatusPill>
           )}
           <h2 className="panel-title" style={{ marginTop: 10 }}>{copy?.title}</h2>
-          <p className="muted" style={{ marginTop: 4 }}>{copy?.description}</p>
+          <p role={trip.status === 'Paid' ? 'status' : undefined} className="muted" style={{ marginTop: 4 }}>{copy?.description}</p>
 
           {!quoted && !terminal && (
             <ol aria-label="Tiến trình chuyến đi" className="stepper">

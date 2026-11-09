@@ -1,8 +1,9 @@
 import type { Actor } from '../services/auth';
 import type { TripApi } from '../services/tripApi';
-import type {
-  CreateTripInput,
-  TripResponse,
+import {
+  isTerminalStatus,
+  type CreateTripInput,
+  type TripResponse,
 } from '../types/tripTypes';
 
 export interface TripState {
@@ -86,8 +87,16 @@ export function createTripStore(api: TripApi, initialActor: Actor): TripStore {
 
     try {
       if (state.actor.role === 'rider') {
-        const currentTrip = await api.getCurrentTrip();
+        let currentTrip = await api.getCurrentTrip();
         if (currentGen !== generation) return;
+
+        const displayedTrip = state.trip;
+        if (!currentTrip && displayedTrip) {
+          currentTrip = isTerminalStatus(displayedTrip.status)
+            ? displayedTrip
+            : await api.getTripById(displayedTrip.id);
+          if (currentGen !== generation) return;
+        }
 
         updateState({
           trip: currentTrip,

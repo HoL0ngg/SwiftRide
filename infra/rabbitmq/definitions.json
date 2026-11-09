@@ -7,7 +7,7 @@
   ],
   "exchanges": [
     {
-      "name": "swiftride.v1.trip-accepted",
+      "name": "SwiftRide.Contracts.V1:TripAcceptedV1",
       "vhost": "/",
       "type": "fanout",
       "durable": true,
@@ -16,7 +16,7 @@
       "arguments": {}
     },
     {
-      "name": "swiftride.v1.ride-completed",
+      "name": "SwiftRide.Contracts.V1:RideCompletedV1",
       "vhost": "/",
       "type": "fanout",
       "durable": true,
@@ -25,7 +25,7 @@
       "arguments": {}
     },
     {
-      "name": "swiftride.v1.payment-settled",
+      "name": "SwiftRide.Contracts.V1:PaymentSettledV1",
       "vhost": "/",
       "type": "fanout",
       "durable": true,
@@ -34,7 +34,7 @@
       "arguments": {}
     },
     {
-      "name": "swiftride.v1.payment-failed",
+      "name": "SwiftRide.Contracts.V1:PaymentFailedV1",
       "vhost": "/",
       "type": "fanout",
       "durable": true,
@@ -43,7 +43,7 @@
       "arguments": {}
     },
     {
-      "name": "swiftride.v1.payment-compensation-requested",
+      "name": "SwiftRide.Contracts.V1:PaymentCompensationRequestedV1",
       "vhost": "/",
       "type": "fanout",
       "durable": true,
@@ -52,7 +52,7 @@
       "arguments": {}
     },
     {
-      "name": "swiftride.v1.payment-refunded",
+      "name": "SwiftRide.Contracts.V1:PaymentRefundedV1",
       "vhost": "/",
       "type": "fanout",
       "durable": true,
@@ -61,7 +61,7 @@
       "arguments": {}
     },
     {
-      "name": "swiftride.v1.payment-compensation-failed",
+      "name": "SwiftRide.Contracts.V1:PaymentCompensationFailedV1",
       "vhost": "/",
       "type": "fanout",
       "durable": true,
@@ -116,7 +116,7 @@
   ],
   "bindings": [
     {
-      "source": "swiftride.v1.ride-completed",
+      "source": "SwiftRide.Contracts.V1:RideCompletedV1",
       "vhost": "/",
       "destination": "payment-ride-completed",
       "destination_type": "queue",
@@ -124,7 +124,7 @@
       "arguments": {}
     },
     {
-      "source": "swiftride.v1.payment-settled",
+      "source": "SwiftRide.Contracts.V1:PaymentSettledV1",
       "vhost": "/",
       "destination": "trip-payment-settled",
       "destination_type": "queue",
@@ -132,7 +132,7 @@
       "arguments": {}
     },
     {
-      "source": "swiftride.v1.payment-failed",
+      "source": "SwiftRide.Contracts.V1:PaymentFailedV1",
       "vhost": "/",
       "destination": "trip-payment-failed",
       "destination_type": "queue",
@@ -140,7 +140,7 @@
       "arguments": {}
     },
     {
-      "source": "swiftride.v1.payment-compensation-requested",
+      "source": "SwiftRide.Contracts.V1:PaymentCompensationRequestedV1",
       "vhost": "/",
       "destination": "payment-compensation",
       "destination_type": "queue",
@@ -148,7 +148,7 @@
       "arguments": {}
     },
     {
-      "source": "swiftride.v1.payment-refunded",
+      "source": "SwiftRide.Contracts.V1:PaymentRefundedV1",
       "vhost": "/",
       "destination": "trip-payment-refunded",
       "destination_type": "queue",
@@ -156,7 +156,7 @@
       "arguments": {}
     },
     {
-      "source": "swiftride.v1.payment-compensation-failed",
+      "source": "SwiftRide.Contracts.V1:PaymentCompensationFailedV1",
       "vhost": "/",
       "destination": "trip-payment-compensation-failed",
       "destination_type": "queue",

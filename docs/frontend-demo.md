@@ -25,6 +25,8 @@ Link cũ `/?role=rider` và `/?role=driver` vẫn dùng được: trang `/` chuy
   Vị trí mặc định là trung tâm TP.HCM; tài xế **bấm lên bản đồ** để chọn vị trí khi đang Online và chưa nhận chuyến.
 - Thu nhập tài xế tính từ lịch sử (20 chuyến gần nhất), chỉ cộng các chuyến `Paid`; được tải lại khi vào trang và khi chuyến hiện tại đổi trạng thái.
 - Tự động thanh toán và đối chiếu sau khi trả khách, không có nút thanh toán thủ công.
+- Khi chuyến đang theo dõi không còn trong `/trips/current`, ứng dụng khách đọc lại `/trips/{id}` để xác nhận trạng thái cuối. Chỉ hiển thị thanh toán thành công khi backend trả `Paid`.
+- Giữ màn hình hoàn tất, giá tiền và thông báo thanh toán thành công cho đến khi khách bấm **Đặt một chuyến mới**; các lượt polling tiếp theo không tự đóng màn hình này.
 
 Không còn chế độ Demo Fallback bằng `localStorage`; giao diện luôn cần backend (hoặc Gateway) đang chạy.
 

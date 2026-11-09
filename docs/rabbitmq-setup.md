@@ -4,7 +4,7 @@ Tài liệu này hướng dẫn **bật và vận hành** RabbitMQ (MassTransit 
 
 > Tài liệu liên quan: [messaging-contracts-v1.md](messaging-contracts-v1.md) (contract + topology), [messaging-operations.md](messaging-operations.md) (retry, DLQ, replay, xử lý sự cố), [architecture.md](architecture.md).
 >
-> Các lệnh/đường dẫn dưới đây được viết dựa trên việc đọc `docker-compose.yml`, `.env.example`, `infra/rabbitmq/*` và code `MessagingRegistration.cs`. Chưa chạy lại toàn bộ quy trình khi viết tài liệu này.
+> Cập nhật 09/11/2026: đã khôi phục chuyến bị kẹt PaymentPending trên broker thật; sửa thứ tự tạo tài khoản/import topology và đối chiếu tên exchange với MassTransit.
 
 ---
 
@@ -29,7 +29,7 @@ Trip Service                                   Payment Service
 | File | Vai trò |
 |---|---|
 | `docker-compose.yml` (service `rabbitmq`, profile `messaging`) | Chạy broker, mount config |
-| `infra/rabbitmq/rabbitmq.conf` | `load_definitions` khi khởi động |
+| `infra/rabbitmq/rabbitmq.conf` | Cấu hình broker; không import definitions khi node còn trống |
 | `infra/rabbitmq/definitions.json` | Khai báo sẵn exchange / queue / binding |
 | `src/SwiftRide.Contracts/V1/EventTopology.cs` | Hằng số tên exchange & queue |
 | `src/TripService/Infrastructure/Messaging/MessagingRegistration.cs` | Đăng ký MassTransit cho Trip |
@@ -89,6 +89,10 @@ docker compose --profile messaging up --build -d
 docker compose --profile messaging ps
 ```
 
+Healthcheck chỉ đạt sau khi broker phản hồi, xác thực được tài khoản từ environment và đã có đủ 6 binding V1 tới queue sau khi import definitions. Lệnh import trả về trước khi tác vụ hoàn tất, nên không đánh dấu sẵn sàng chỉ dựa vào exit code của lệnh này. Trip/Payment chờ broker healthy khi profile `messaging` được bật; dependency tùy chọn giữ cho luồng REST chạy được khi không bật profile.
+
+Không dùng `load_definitions` lúc boot: [RabbitMQ bỏ qua việc tạo default user khi node trống import definitions](https://www.rabbitmq.com/docs/definitions#import-on-boot-nuances), trong khi file của dự án không chứa credential. Healthcheck import topology một lần sau khi RabbitMQ tạo tài khoản từ environment; marker nằm trong `/tmp` của container.
+
 Kiểm tra broker đã healthy và đã nạp definitions:
 
 ```powershell
@@ -97,16 +101,16 @@ docker compose --profile messaging exec rabbitmq rabbitmqctl list_queues name me
 docker compose --profile messaging exec rabbitmq rabbitmqctl list_exchanges name type
 ```
 
-Kết quả mong đợi: 6 queue (`payment-ride-completed`, `payment-compensation`, `trip-payment-settled`, `trip-payment-failed`, `trip-payment-refunded`, `trip-payment-compensation-failed`) và các exchange `swiftride.v1.*`.
+Kết quả mong đợi: 6 queue (`payment-ride-completed`, `payment-compensation`, `trip-payment-settled`, `trip-payment-failed`, `trip-payment-refunded`, `trip-payment-compensation-failed`) và các exchange dạng `SwiftRide.Contracts.V1:RideCompletedV1`, đúng tên MassTransit publish.
 
 ### Mở cổng quản trị / AMQP (chỉ khi cần, chỉ cho máy local)
 
-`docker-compose.yml` hiện **không publish** cổng của RabbitMQ (đúng với `messaging-operations.md` mục 4: không expose broker). Muốn mở Management UI hoặc cho service chạy ngoài Docker kết nối, tạo `docker-compose.override.yml` **local** (không commit):
+`docker-compose.yml` hiện publish cổng 5672 và 15672. Khi chỉ demo trên máy local, có thể giới hạn về loopback bằng `docker-compose.override.yml` **local** (không commit):
 
 ```yaml
 services:
   rabbitmq:
-    ports:
+    ports: !override
       - "127.0.0.1:5672:5672"     # AMQP
       - "127.0.0.1:15672:15672"   # Management UI
 ```
@@ -235,8 +239,8 @@ Bật RabbitMQ **chưa** đồng nghĩa mọi chuyến đi dùng event. Mỗi ch
 | Service crash khi khởi động: `RabbitMQ:Host is missing or empty` | `MESSAGING_TRANSPORT=RabbitMQ` nhưng `RABBITMQ_HOST` rỗng | Đặt `RABBITMQ_HOST=rabbitmq` (compose) hoặc `localhost` (chạy ngoài Docker) |
 | `Unsupported Messaging:Transport` | Sai chính tả giá trị | Dùng `None`, `InMemory`, `RabbitMQ` |
 | `docker compose` báo `Set RABBITMQ_USER` | Thiếu biến trong `.env` | Điền `RABBITMQ_USER`/`RABBITMQ_PASSWORD` |
-| `ACCESS_REFUSED` khi service kết nối | Đổi mật khẩu trong `.env` nhưng volume `rabbitmq-data` còn user cũ | `docker compose --profile messaging down` rồi xoá volume `rabbitmq-data` (**mất dữ liệu broker**), hoặc đổi mật khẩu bằng `rabbitmqctl change_password` |
-| Trip kẹt `DroppedOff`/`PaymentPending` ở chế độ `Events` | Broker sập hoặc consumer lỗi | Event vẫn nằm trong outbox, tự gửi lại khi broker sống; kiểm tra `_error` queue |
+| `ACCESS_REFUSED` khi service kết nối | User chưa tồn tại hoặc password trong database broker khác environment | Kiểm tra `rabbitmqctl list_users`; cấp user/quyền nếu thiếu hoặc dùng `change_password` nếu cần. Không xóa volume để sửa lỗi thanh toán |
+| Trip kẹt `DroppedOff`/`PaymentPending` ở chế độ `Events` | Broker/consumer lỗi hoặc topology bootstrap cũ sai tên exchange | Kiểm tra Outbox, Inbox, queue và payment. Event chưa publish còn retry budget sẽ tự gửi lại; event đã publish nhưng chưa có Inbox/payment cần operator replay nguyên EventId và khóa thanh toán |
 | Message trong `<queue>_error` | Poison message / hết retry | Xem `messaging-operations.md` mục 3.2 (đọc header `MT-Fault-Message`, sửa gốc, replay) |
 
 Reset sạch môi trường local (xoá volume, **mất dữ liệu RabbitMQ và SQL Server local**):
@@ -247,15 +251,15 @@ docker compose --profile messaging down -v
 
 ---
 
-## 8. Vấn đề cần lưu ý về topology (đối chiếu docs ↔ code)
+## 8. Topology khi consumer chưa khởi động
 
-Qua đọc code, có một điểm lệch cần bạn xác nhận (tôi **chưa chạy broker để kiểm chứng**):
+`definitions.json` và `EventTopology.Exchanges` dùng tên message mặc định của MassTransit, dạng `SwiftRide.Contracts.V1:RideCompletedV1`. Healthcheck import các durable exchange/queue/binding trước khi service bắt đầu publish. Vì vậy sự kiện có thể chờ trong queue khi consumer chưa chạy.
 
-- `definitions.json` khai báo sẵn các fanout exchange `swiftride.v1.*` và bind vào 6 queue; `EventTopology.Exchanges` cũng định nghĩa các tên này.
-- Tuy nhiên code Infrastructure chỉ dùng `EventTopology.Queues`; **không** thấy nơi nào cấu hình MassTransit publish vào các exchange `swiftride.v1.*` (không có `SetEntityName`/`EntityName` trên contract). Mặc định MassTransit publish vào exchange đặt theo kiểu message (dạng `SwiftRide.Contracts.V1:RideCompletedV1`) và tự tạo binding từ queue của consumer tới exchange đó.
-- Hệ quả: luồng vẫn chạy nhờ MassTransit tự khai báo topology, còn các exchange `swiftride.v1.*` trong `definitions.json` có thể chỉ là exchange "mồ côi" (không ai publish vào), và `messaging-contracts-v1.md` mục 3 mô tả chưa đúng với topology thực tế.
+Cấu hình cũ dùng tên `swiftride.v1.*` nhưng MassTransit không publish vào đó. Publisher confirm chỉ chứng minh broker nhận publish; không chứng minh đã có queue nhận message. Nếu Trip kết nối trước Payment trên broker mới, sự kiện có thể không được định tuyến dù Outbox đã đánh dấu published.
 
-Cách kiểm tra: sau khi chạy một chuyến đi, xem `rabbitmqctl list_exchanges` / `list_bindings` và so với bảng ở `messaging-contracts-v1.md`. Nếu đúng như trên, có hai hướng sửa nhỏ: (a) thêm `EntityName` / `cfg.Message<T>(m => m.SetEntityName(EventTopology.Exchanges.X))` để publish đúng exchange đã khai báo; hoặc (b) bỏ các exchange thừa khỏi `definitions.json` và cập nhật tài liệu. Chọn hướng nào là quyết định của bạn.
+Với volume cũ, `RABBITMQ_DEFAULT_USER`/`RABBITMQ_DEFAULT_PASS` không tự cập nhật tài khoản đã tồn tại. Nếu broker thiếu user do cấu hình cũ, mở shell nội bộ (`docker compose --profile messaging exec rabbitmq sh`), cấp tài khoản bằng biến môi trường và quyền trên vhost `/`, rồi kiểm tra xác thực. Không ghi mật khẩu vào source hoặc xóa dữ liệu broker/ledger.
+
+Các exchange cũ không bị tự động xóa. Khi đổi definitions trên container hiện có, import lại bằng `rabbitmqctl import_definitions /etc/rabbitmq/definitions.json`; không cần recreate broker để có binding mới.
 
 ---
 

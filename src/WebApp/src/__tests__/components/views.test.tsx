@@ -162,6 +162,28 @@ describe('rider booking and trip controls', () => {
 });
 
 describe('payment state is visible to both roles', () => {
+  it('announces successful payment and keeps the new booking action on the receipt', () => {
+    const store = createMockStore(mockTrip('Paid'));
+    const html = renderToStaticMarkup(
+      <RiderView
+        pickup={testPlaces[0]}
+        destination={testPlaces[1]}
+        selection={null}
+        onChange={() => {}}
+        onSelectMap={() => {}}
+        onSwap={() => {}}
+        store={store}
+        session={mockSession}
+      />
+    );
+    expect(text(html)).toContain('Thanh toán thành công');
+    expect(text(html)).toContain('Đã thanh toán');
+    expect(html).toContain('role="status"');
+    expect(buttons(html)).toContain('Đặt một chuyến mới');
+    expect(text(html)).not.toContain('Hệ thống đang đối soát');
+    expect(buttons(html)).not.toContain('Xem giá chuyến đi');
+  });
+
   it('keeps PaymentPending distinct from a paid trip in rider view', () => {
     const store = createMockStore(mockTrip('PaymentPending'));
     const html = renderToStaticMarkup(
