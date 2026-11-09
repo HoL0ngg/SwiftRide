@@ -130,6 +130,46 @@ public class TripPersistenceTests
     }
 
     [LocalSqlServerFact]
+    public async Task GetCurrentTrip_ClearsStaleRiderSlotForPaidTrip()
+    {
+        var riderId = $"rider-paid-{Guid.NewGuid():N}";
+        var driverId = $"driver-paid-{Guid.NewGuid():N}";
+        var tripId = Guid.NewGuid();
+        var quoteId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        await using (var seedDb = _fixture.CreateDbContext())
+        {
+            var trip = Trip.Request(tripId, riderId);
+            trip.ApplyQuote(new FareSnapshot(quoteId, 50000m, "VND"), driverId);
+            trip.ConfirmQuote(riderId, quoteId, driverId);
+            trip.AcceptDriver(driverId);
+            trip.StartEnRoute(driverId);
+            trip.Pickup(driverId);
+            trip.Dropoff(driverId, now);
+            trip.RequestPayment();
+            trip.SettlePayment(new PaymentSettlement(
+                Guid.NewGuid(), tripId, 50000m, "VND", trip.PaymentIdempotencyKey!));
+
+            var writer = new TripRepository(seedDb);
+            writer.Add(new TripContext(
+                trip, "Pickup", "Pickup address", 10.7, 106.6, "Destination", "Destination address",
+                10.8, 106.7, "wallet", "wallet.success.v1", 5m, 15m, now, now));
+            seedDb.ActiveRiderTrips.Add(new ActiveRiderTripRecord { RiderId = riderId, TripId = tripId });
+            await new TripUnitOfWork(seedDb).SaveAsync(CancellationToken.None);
+        }
+
+        await using (var queryDb = _fixture.CreateDbContext())
+        {
+            var reader = new TripQueryReader(queryDb);
+            Assert.Null(await reader.GetCurrentAsync(new TripActor(riderId, "rider"), CancellationToken.None));
+        }
+
+        await using var verifyDb = _fixture.CreateDbContext();
+        Assert.False(await verifyDb.ActiveRiderTrips.AnyAsync(slot => slot.RiderId == riderId));
+    }
+
+    [LocalSqlServerFact]
     public async Task ActiveDriverAssignment_TwoClaimsSameDriver_ThrowsUniqueConstraintException()
     {
         await using var db = _fixture.CreateDbContext();

@@ -70,6 +70,8 @@ services:
 
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    ports:
+      - "1433:1433"
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: ${SQLSERVER_PASSWORD:?Set SQLSERVER_PASSWORD}
@@ -89,7 +91,11 @@ services:
     volumes:
       - trip-data:/var/opt/mssql
     healthcheck:
-      test: [ "CMD-SHELL", '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -d TripDB -l 5 -b -Q "SELECT 1" >/dev/null' ]
+      test:
+        [
+          "CMD-SHELL",
+          '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -d TripDB -l 5 -b -Q "SELECT 1" >/dev/null',
+        ]
       interval: 10s
       timeout: 10s
       retries: 15
@@ -97,7 +103,10 @@ services:
 
   rabbitmq:
     image: rabbitmq:4.1-management
-    profiles: [ "messaging" ]
+    profiles: ["messaging"]
+    ports:
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Set RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}
@@ -106,7 +115,7 @@ services:
       - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 10s
       retries: 10

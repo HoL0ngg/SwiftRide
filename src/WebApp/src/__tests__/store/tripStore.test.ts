@@ -81,6 +81,36 @@ describe('tripStore', () => {
     store.stopPolling();
   });
 
+  it('clears a completed trip without restoring it from an in-flight poll', async () => {
+    const paidTrip: TripResponse = { ...sampleTrip, status: 'Paid' };
+    let resolveStalePoll!: (trip: TripResponse | null) => void;
+    const stalePoll = new Promise<TripResponse | null>(resolve => {
+      resolveStalePoll = resolve;
+    });
+    vi.mocked(mockApi.getCurrentTrip)
+      .mockResolvedValueOnce(paidTrip)
+      .mockImplementationOnce(() => stalePoll);
+
+    const store = createTripStore(mockApi, { userId: 'rider-1', role: 'rider' });
+    store.startPolling();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(store.getState().trip?.status).toBe('Paid');
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(mockApi.getCurrentTrip).toHaveBeenCalledTimes(2);
+
+    store.clearTrip();
+    expect(store.getState().trip).toBeNull();
+    expect(store.getState().actor).toEqual({ userId: 'rider-1', role: 'rider' });
+
+    resolveStalePoll(paidTrip);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(store.getState().trip).toBeNull();
+    expect(mockApi.getCurrentTrip).toHaveBeenCalledTimes(2);
+
+    store.stopPolling();
+  });
+
   it('polls driver feed for driver role', async () => {
     const store = createTripStore(mockApi, { userId: 'driver-1', role: 'driver' });
     const feed: DriverFeedApiResponse = {

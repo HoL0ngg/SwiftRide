@@ -371,9 +371,7 @@ export default function RiderView({
             {terminal && (
               <button
                 disabled={loading}
-                onClick={() => {
-                  store.setActor(store.getState().actor);
-                }}
+                onClick={() => store.clearTrip()}
                 className="btn btn-primary btn-block"
               >
                 <Sparkles size={18} aria-hidden="true" />

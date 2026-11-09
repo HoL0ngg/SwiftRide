@@ -57,6 +57,7 @@ function createMockStore(trip: TripResponse | null = null, history: TripResponse
     stopPolling: vi.fn(),
     poll: vi.fn(),
     setActor: vi.fn(),
+    clearTrip: vi.fn(),
     createTrip: vi.fn(),
     confirmQuote: vi.fn(),
     cancelTrip: vi.fn(),

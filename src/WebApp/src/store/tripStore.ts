@@ -23,6 +23,7 @@ export interface TripStore {
   stopPolling(): void;
   poll(): Promise<void>;
   setActor(actor: Actor): void;
+  clearTrip(): void;
   createTrip(input: CreateTripInput): Promise<TripResponse>;
   confirmQuote(tripId: string, quoteId: string): Promise<TripResponse>;
   cancelTrip(tripId: string, reason?: string): Promise<TripResponse>;
@@ -115,7 +116,9 @@ export function createTripStore(api: TripApi, initialActor: Actor): TripStore {
       });
       scheduleNextPoll(isRateLimited ? RATE_LIMIT_BACKOFF_MS : DEFAULT_POLL_INTERVAL_MS);
     } finally {
-      inFlight = false;
+      if (currentGen === generation) {
+        inFlight = false;
+      }
     }
   }
 
@@ -172,6 +175,24 @@ export function createTripStore(api: TripApi, initialActor: Actor): TripStore {
       if (isPolling) {
         void pollInternal();
       }
+    },
+
+    clearTrip() {
+      generation++;
+      if (timerId !== null) {
+        clearTimeout(timerId);
+        timerId = null;
+      }
+      inFlight = false;
+
+      updateState({
+        trip: null,
+        offeredTrip: null,
+        activeTrip: null,
+        error: null,
+        loading: false,
+      });
+      scheduleNextPoll();
     },
 
     async createTrip(input: CreateTripInput) {

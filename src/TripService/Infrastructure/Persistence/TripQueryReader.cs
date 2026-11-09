@@ -19,13 +19,33 @@ public sealed class TripQueryReader : ITripQueryReader
     {
         ArgumentNullException.ThrowIfNull(actor);
 
-        Guid? activeTripId = null;
         if (actor.IsRider)
         {
             var activeRider = await _db.ActiveRiderTrips.FirstOrDefaultAsync(a => a.RiderId == actor.Id, ct);
-            activeTripId = activeRider?.TripId;
+            if (activeRider is null)
+            {
+                return null;
+            }
+
+            var riderTrip = await _db.Trips
+                .Include(t => t.Rejections)
+                .FirstOrDefaultAsync(t => t.Id == activeRider.TripId, ct);
+
+            if (riderTrip is null ||
+                riderTrip.Status == nameof(TripStatus.Paid) ||
+                riderTrip.Status == nameof(TripStatus.Cancelled) ||
+                riderTrip.Status == nameof(TripStatus.Failed))
+            {
+                _db.ActiveRiderTrips.Remove(activeRider);
+                await _db.SaveChangesAsync(ct);
+                return null;
+            }
+
+            return riderTrip.ToContext();
         }
-        else if (actor.IsDriver)
+
+        Guid? activeTripId = null;
+        if (actor.IsDriver)
         {
             var activeDriver = await _db.ActiveDriverAssignments.FirstOrDefaultAsync(a => a.DriverId == actor.Id, ct);
             activeTripId = activeDriver?.TripId;
