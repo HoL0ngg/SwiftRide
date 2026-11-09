@@ -151,6 +151,7 @@ Hệ thống đã được củng cố toàn diện với các quy tắc kỹ th
 
 5. **Loại trừ tài xế bận & Rematch linh hoạt:**
    - Trong bước `ConfirmQuote` và `DriverReject`, nếu tài xế ứng viên từ Matching đã bị chuyến khác giữ (`TryClaimDriver == false`), hệ thống tự động đưa vào danh sách loại trừ (`excludedDrivers`) và gọi lại Matching để tìm tài xế khác trong giới hạn $k$ lần (mặc định $k=3$). Chuyến xe chỉ chuyển sang `Failed` an toàn khi hết số lần thử, không gây lỗi 500.
+   - $k$ cấu hình qua biến môi trường `TRIP_LIFECYCLE_MAX_DRIVER_REJECTIONS` trong `.env` (docker-compose ánh xạ sang `TripLifecycle__MaxDriverRejections` của Trip Service). Mỗi lần tài xế từ chối, hệ thống tiếp tục tìm tài xế khác; khi số lần từ chối vượt $k$ (lần thứ $k+1$) chuyến chuyển sang `Failed`.
 
 6. **Đối chiếu danh tính chặt chẽ trước khi quyết toán (`Paid`):**
    - Trước khi cập nhật chuyến sang `Paid`, hệ thống đối chiếu chặt chẽ toàn bộ thông tin: `TripId`, `RiderId`, `AssignedDriverId`, `FareAmount`, `Currency`, và kiểm tra không có refund đã settled.
