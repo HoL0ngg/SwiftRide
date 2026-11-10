@@ -11,6 +11,12 @@ public static class EventTopology
         public const string PaymentCompensationRequested = "SwiftRide.Contracts.V1:PaymentCompensationRequestedV1";
         public const string PaymentRefunded = "SwiftRide.Contracts.V1:PaymentRefundedV1";
         public const string PaymentCompensationFailed = "SwiftRide.Contracts.V1:PaymentCompensationFailedV1";
+        public const string QuoteRequested = "SwiftRide.Contracts.V1:QuoteRequestedV1";
+        public const string QuoteReady = "SwiftRide.Contracts.V1:QuoteReadyV1";
+        public const string QuoteFailed = "SwiftRide.Contracts.V1:QuoteFailedV1";
+        public const string DriverMatchRequested = "SwiftRide.Contracts.V1:DriverMatchRequestedV1";
+        public const string DriverMatched = "SwiftRide.Contracts.V1:DriverMatchedV1";
+        public const string DriverMatchFailed = "SwiftRide.Contracts.V1:DriverMatchFailedV1";
     }
 
     public static class Queues
@@ -21,5 +27,11 @@ public static class EventTopology
         public const string PaymentCompensation = "payment-compensation";
         public const string TripPaymentRefunded = "trip-payment-refunded";
         public const string TripPaymentCompensationFailed = "trip-payment-compensation-failed";
+        public const string MatchingQuoteRequested = "matching-quote-requested";
+        public const string MatchingDriverMatchRequested = "matching-driver-match-requested";
+        public const string TripQuoteReady = "trip-quote-ready";
+        public const string TripQuoteFailed = "trip-quote-failed";
+        public const string TripDriverMatched = "trip-driver-matched";
+        public const string TripDriverMatchFailed = "trip-driver-match-failed";
     }
 }

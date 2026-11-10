@@ -14,6 +14,8 @@ public static class DependencyInjection
             .BindConfiguration("TripLifecycle")
             .Validate(o => o.MaxDriverRejections > 0, "MaxDriverRejections must be > 0")
             .Validate(o => o.SupportedPricingModes != null && o.SupportedPricingModes.Length > 0, "SupportedPricingModes must not be empty")
+            .Validate(o => string.Equals(o.MatchingTransport, "Rest", StringComparison.OrdinalIgnoreCase) || o.UsesEventMatching,
+                "MatchingTransport must be 'Rest' or 'Events'")
             .ValidateOnStart();
 
         services.AddOptions<TripRecoveryOptions>()

@@ -23,9 +23,13 @@ public sealed class TripCommandUseCase(
     ILogger<TripCommandUseCase> logger,
     TripPaymentCoordinator? paymentCoordinator = null,
     IOptions<PaymentWorkflowOptions>? paymentOptions = null,
-    ITripEventWriter? eventWriter = null)
+    ITripEventWriter? eventWriter = null,
+    IOptions<TripLifecycleOptions>? lifecycleOptions = null)
 {
     private readonly PaymentWorkflowOptions _paymentOptions = paymentOptions?.Value ?? new PaymentWorkflowOptions();
+    private readonly bool _useEventMatching = (lifecycleOptions?.Value ?? new TripLifecycleOptions()).UsesEventMatching
+        && eventWriter is { IsAvailable: true };
+
     public async Task<TripCommandOutcome> ExecuteAsync(
         TripActor actor,
         Guid tripId,
@@ -79,6 +83,13 @@ public sealed class TripCommandUseCase(
                 }
 
                 trip.ConfirmQuote(actor.Id, confirm.QuoteId);
+                if (_useEventMatching)
+                {
+                    // Fare is locked; the driver is offered when Matching answers (DriverMatchedV1).
+                    StageDriverMatchRequest(ctx, now);
+                    break;
+                }
+
                 return await MatchAndOfferDriverAsync(ctx, scope, commandKey, payloadHash, command.ActionName, now, ct);
 
             case DriverAcceptCommand:
@@ -128,6 +139,12 @@ public sealed class TripCommandUseCase(
 
                 if (trip.Status == TripStatus.DriverOffered)
                 {
+                    if (_useEventMatching)
+                    {
+                        StageDriverMatchRequest(ctx, now);
+                        break;
+                    }
+
                     return await MatchAndOfferDriverAsync(ctx, scope, commandKey, payloadHash, command.ActionName, now, ct);
                 }
                 break;
@@ -238,6 +255,19 @@ public sealed class TripCommandUseCase(
         }
 
         return new TripCommandOutcome(TripMapper.ToReadModel(ctx), IsReplay: false, command.ActionName);
+    }
+
+    private void StageDriverMatchRequest(TripContext ctx, DateTimeOffset now)
+    {
+        var trip = ctx.Trip;
+        eventWriter!.Add(new DriverMatchRequestedV1(
+            EventId: Guid.NewGuid(),
+            TripId: trip.Id,
+            PickupLatitude: ctx.PickupLat,
+            PickupLongitude: ctx.PickupLon,
+            ExcludedDriverIds: trip.RejectedDriverIds.Take(100).ToArray(),
+            OccurredAtUtc: now,
+            CorrelationId: $"trip-{trip.Id:D}-match-{trip.RejectionCount}"));
     }
 
     private async Task<TripCommandOutcome> MatchAndOfferDriverAsync(

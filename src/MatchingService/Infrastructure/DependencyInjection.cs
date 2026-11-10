@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using SwiftRide.MatchingService.Application;
 using SwiftRide.MatchingService.Infrastructure.Geocoding;
+using SwiftRide.MatchingService.Infrastructure.Messaging;
 using SwiftRide.MatchingService.Infrastructure.Persistence;
 
 namespace SwiftRide.MatchingService.Infrastructure;
@@ -28,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<IDriverLocationWriter>(p => p.GetRequiredService<MatchingRepository>());
         services.AddScoped<IQuoteWriter>(p => p.GetRequiredService<MatchingRepository>());
         services.AddGeocoding(configuration);
+        services.AddMatchingMessaging(configuration);
         return services;
     }
 }

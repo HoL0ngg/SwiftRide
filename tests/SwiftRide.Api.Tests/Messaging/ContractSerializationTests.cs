@@ -193,6 +193,20 @@ public class ContractSerializationTests
         Assert.Equal("payment-compensation", EventTopology.Queues.PaymentCompensation);
         Assert.Equal("trip-payment-refunded", EventTopology.Queues.TripPaymentRefunded);
         Assert.Equal("trip-payment-compensation-failed", EventTopology.Queues.TripPaymentCompensationFailed);
+
+        Assert.Equal("SwiftRide.Contracts.V1:QuoteRequestedV1", EventTopology.Exchanges.QuoteRequested);
+        Assert.Equal("SwiftRide.Contracts.V1:QuoteReadyV1", EventTopology.Exchanges.QuoteReady);
+        Assert.Equal("SwiftRide.Contracts.V1:QuoteFailedV1", EventTopology.Exchanges.QuoteFailed);
+        Assert.Equal("SwiftRide.Contracts.V1:DriverMatchRequestedV1", EventTopology.Exchanges.DriverMatchRequested);
+        Assert.Equal("SwiftRide.Contracts.V1:DriverMatchedV1", EventTopology.Exchanges.DriverMatched);
+        Assert.Equal("SwiftRide.Contracts.V1:DriverMatchFailedV1", EventTopology.Exchanges.DriverMatchFailed);
+
+        Assert.Equal("matching-quote-requested", EventTopology.Queues.MatchingQuoteRequested);
+        Assert.Equal("matching-driver-match-requested", EventTopology.Queues.MatchingDriverMatchRequested);
+        Assert.Equal("trip-quote-ready", EventTopology.Queues.TripQuoteReady);
+        Assert.Equal("trip-quote-failed", EventTopology.Queues.TripQuoteFailed);
+        Assert.Equal("trip-driver-matched", EventTopology.Queues.TripDriverMatched);
+        Assert.Equal("trip-driver-match-failed", EventTopology.Queues.TripDriverMatchFailed);
     }
 
     [Fact]
@@ -210,7 +224,13 @@ public class ContractSerializationTests
             (typeof(PaymentFailedV1), EventTopology.Queues.TripPaymentFailed),
             (typeof(PaymentCompensationRequestedV1), EventTopology.Queues.PaymentCompensation),
             (typeof(PaymentRefundedV1), EventTopology.Queues.TripPaymentRefunded),
-            (typeof(PaymentCompensationFailedV1), EventTopology.Queues.TripPaymentCompensationFailed)
+            (typeof(PaymentCompensationFailedV1), EventTopology.Queues.TripPaymentCompensationFailed),
+            (typeof(QuoteRequestedV1), EventTopology.Queues.MatchingQuoteRequested),
+            (typeof(DriverMatchRequestedV1), EventTopology.Queues.MatchingDriverMatchRequested),
+            (typeof(QuoteReadyV1), EventTopology.Queues.TripQuoteReady),
+            (typeof(QuoteFailedV1), EventTopology.Queues.TripQuoteFailed),
+            (typeof(DriverMatchedV1), EventTopology.Queues.TripDriverMatched),
+            (typeof(DriverMatchFailedV1), EventTopology.Queues.TripDriverMatchFailed)
         };
 
         foreach (var (messageType, queue) in routes)

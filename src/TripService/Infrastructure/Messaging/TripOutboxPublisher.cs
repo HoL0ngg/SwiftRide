@@ -223,8 +223,27 @@ public sealed class TripOutboxPublisher : BackgroundService
                     await endpoint.Publish(comp, ct);
                 break;
 
+            case nameof(QuoteRequestedV1):
+                await PublishAsync<QuoteRequestedV1>(endpoint, payloadJson, traceParent, ct);
+                break;
+
+            case nameof(DriverMatchRequestedV1):
+                await PublishAsync<DriverMatchRequestedV1>(endpoint, payloadJson, traceParent, ct);
+                break;
+
             default:
                 throw new NotSupportedException($"Unsupported outbox event type: {eventType}");
         }
+    }
+
+    private static async Task PublishAsync<T>(IPublishEndpoint endpoint, string payloadJson, string? traceParent, CancellationToken ct)
+        where T : class
+    {
+        var message = JsonSerializer.Deserialize<T>(payloadJson, JsonOptions)
+            ?? throw new InvalidOperationException($"Unable to deserialize {typeof(T).Name}");
+        if (!string.IsNullOrWhiteSpace(traceParent))
+            await endpoint.Publish(message, ctx => ctx.Headers.Set("traceparent", traceParent), ct);
+        else
+            await endpoint.Publish(message, ct);
     }
 }

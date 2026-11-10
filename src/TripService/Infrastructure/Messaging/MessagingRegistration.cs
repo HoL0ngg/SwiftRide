@@ -49,6 +49,10 @@ public static class MessagingRegistration
             x.AddConsumer<PaymentFailedConsumer>();
             x.AddConsumer<PaymentRefundedConsumer>();
             x.AddConsumer<PaymentCompensationFailedConsumer>();
+            x.AddConsumer<QuoteReadyConsumer>();
+            x.AddConsumer<QuoteFailedConsumer>();
+            x.AddConsumer<DriverMatchedConsumer>();
+            x.AddConsumer<DriverMatchFailedConsumer>();
 
             if (isExplicitInMemory)
             {
@@ -95,6 +99,30 @@ public static class MessagingRegistration
                     {
                         BoundedMessageRetryPolicy.ConfigureEndpoint(e, configuration);
                         e.ConfigureConsumer<PaymentCompensationFailedConsumer>(context);
+                    });
+
+                    cfg.ReceiveEndpoint(EventTopology.Queues.TripQuoteReady, e =>
+                    {
+                        BoundedMessageRetryPolicy.ConfigureEndpoint(e, configuration);
+                        e.ConfigureConsumer<QuoteReadyConsumer>(context);
+                    });
+
+                    cfg.ReceiveEndpoint(EventTopology.Queues.TripQuoteFailed, e =>
+                    {
+                        BoundedMessageRetryPolicy.ConfigureEndpoint(e, configuration);
+                        e.ConfigureConsumer<QuoteFailedConsumer>(context);
+                    });
+
+                    cfg.ReceiveEndpoint(EventTopology.Queues.TripDriverMatched, e =>
+                    {
+                        BoundedMessageRetryPolicy.ConfigureEndpoint(e, configuration);
+                        e.ConfigureConsumer<DriverMatchedConsumer>(context);
+                    });
+
+                    cfg.ReceiveEndpoint(EventTopology.Queues.TripDriverMatchFailed, e =>
+                    {
+                        BoundedMessageRetryPolicy.ConfigureEndpoint(e, configuration);
+                        e.ConfigureConsumer<DriverMatchFailedConsumer>(context);
                     });
 
                     cfg.ConfigureEndpoints(context);

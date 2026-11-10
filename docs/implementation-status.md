@@ -37,6 +37,19 @@ Dự án được nghiệm thu thực tế theo 3 mốc (Milestone A -> B -> C):
 | **Task 17** | Giữ UI bản đồ/lịch sử và bảo đảm Nominatim fallback | C | **Hoàn thành** | Fallback geocoding offline `FallbackSeedLocations`, bảo toàn Rider/Driver Leaflet map, receipt, heartbeat, 7 tests pass |
 | **Task 18** | Dọn script cũ và nghiệm thu toàn diện | C | **Hoàn thành** | Chạy full test suites: 113 integration tests (0 skips), 421+ unit tests pass 100%, frontend 104 vitest pass |
 
+### Bổ sung 11/2026: Trip ↔ Matching qua RabbitMQ (`MatchingTransport=Events`)
+
+**Trạng thái: đã viết code, test và tài liệu; CHƯA build, CHƯA chạy test, CHƯA chạy với broker thật** (máy phát triển lúc viết không có .NET SDK, Docker hay kết nối Supabase). Cần chạy `dotnet build SwiftRide.sln`, `dotnet test SwiftRide.sln` và một lượt `docker compose --profile messaging up --build` với `MESSAGING_TRANSPORT=RabbitMQ`, `TRIP_LIFECYCLE_MATCHING_TRANSPORT=Events` trước khi coi là nghiệm thu.
+
+| Hạng mục | Nội dung |
+|:---|:---|
+| Contracts | 6 event V1 mới: `QuoteRequestedV1`, `QuoteReadyV1`, `QuoteFailedV1`, `DriverMatchRequestedV1`, `DriverMatchedV1`, `DriverMatchFailedV1` |
+| Matching | `QuoteRequestedConsumer`, `DriverMatchRequestedConsumer`, `AddMatchingMessaging`; `CreateQuote` nhận `quoteId` tất định, `AddAsync` idempotent |
+| Trip | `TripLifecycleOptions.MatchingTransport`, event writer/outbox cho 2 request, 4 consumer reply (`QuoteReady`, `QuoteFailed`, `DriverMatched`, `DriverMatchFailed`) với inbox cùng transaction |
+| Hạ tầng | `definitions.json` thêm 6 exchange/queue/binding; healthcheck compose chờ 12 binding; compose truyền biến RabbitMQ cho `matching-service` |
+| Test mới | `EventMatchingTests` (Trip use case, Moq), `MatchingConsumerTests` (MassTransit test harness), `TripMatchingConsumerTests` (cần SQL Server local), mở rộng kiểm tra topology trong `ContractSerializationTests` |
+| Tài liệu | `messaging-operations.md` mục 3.5, `messaging-contracts-v1.md` mục 2.8, `rabbitmq-setup.md`, `architecture.md`, `AGENTS.md` mục 6 |
+
 ---
 
 ## 2. Chi tiết 4 Điểm Khắc Phục Bổ Sung (Đợt 2)

@@ -4,7 +4,11 @@ namespace SwiftRide.MatchingService.Application;
 
 public sealed class CreateQuote(IQuoteWriter writer, IEnumerable<IPricingStrategy> strategies, MatchingOptions options, TimeProvider clock)
 {
-    public async Task<QuoteResult> ExecuteAsync(GeoPoint pickup, GeoPoint destination, string mode, CancellationToken cancellationToken)
+    /// <param name="quoteId">
+    /// Optional deterministic id. Message consumers pass an id derived from the request so a redelivered
+    /// request maps to the same stored quote (idempotent).
+    /// </param>
+    public async Task<QuoteResult> ExecuteAsync(GeoPoint pickup, GeoPoint destination, string mode, CancellationToken cancellationToken, Guid? quoteId = null)
     {
         var strategy = strategies.FirstOrDefault(s => s.Mode == mode)
             ?? throw new MatchingDomainException("Unsupported pricing mode.");
@@ -15,7 +19,7 @@ public sealed class CreateQuote(IQuoteWriter writer, IEnumerable<IPricingStrateg
         var context = new PricingContext(distance, minutes, options.CostPerKm, options.CostPerMinute,
             options.Surge, options.Toll, options.PromotionFactor, options.Tax);
         var amount = new FareCalculator(strategy).Calculate(context, options.Rounding);
-        var quote = new QuoteSnapshot(Guid.NewGuid(), context, amount, "VND", clock.GetUtcNow());
+        var quote = new QuoteSnapshot(quoteId ?? Guid.NewGuid(), context, amount, "VND", clock.GetUtcNow());
         await writer.AddAsync(quote, cancellationToken);
         return new(quote.Id, amount, quote.Currency, distance, minutes, context, quote.CreatedAt);
     }

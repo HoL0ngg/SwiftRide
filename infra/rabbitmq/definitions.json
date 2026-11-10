@@ -68,6 +68,60 @@
       "auto_delete": false,
       "internal": false,
       "arguments": {}
+    },
+    {
+      "name": "SwiftRide.Contracts.V1:QuoteRequestedV1",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "SwiftRide.Contracts.V1:QuoteReadyV1",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "SwiftRide.Contracts.V1:QuoteFailedV1",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "SwiftRide.Contracts.V1:DriverMatchRequestedV1",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "SwiftRide.Contracts.V1:DriverMatchedV1",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "SwiftRide.Contracts.V1:DriverMatchFailedV1",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
     }
   ],
   "queues": [
@@ -108,6 +162,48 @@
     },
     {
       "name": "trip-payment-compensation-failed",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "matching-quote-requested",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "matching-driver-match-requested",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "trip-quote-ready",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "trip-quote-failed",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "trip-driver-matched",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "trip-driver-match-failed",
       "vhost": "/",
       "durable": true,
       "auto_delete": false,
@@ -159,6 +255,54 @@
       "source": "SwiftRide.Contracts.V1:PaymentCompensationFailedV1",
       "vhost": "/",
       "destination": "trip-payment-compensation-failed",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "SwiftRide.Contracts.V1:QuoteRequestedV1",
+      "vhost": "/",
+      "destination": "matching-quote-requested",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "SwiftRide.Contracts.V1:DriverMatchRequestedV1",
+      "vhost": "/",
+      "destination": "matching-driver-match-requested",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "SwiftRide.Contracts.V1:QuoteReadyV1",
+      "vhost": "/",
+      "destination": "trip-quote-ready",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "SwiftRide.Contracts.V1:QuoteFailedV1",
+      "vhost": "/",
+      "destination": "trip-quote-failed",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "SwiftRide.Contracts.V1:DriverMatchedV1",
+      "vhost": "/",
+      "destination": "trip-driver-matched",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "SwiftRide.Contracts.V1:DriverMatchFailedV1",
+      "vhost": "/",
+      "destination": "trip-driver-match-failed",
       "destination_type": "queue",
       "routing_key": "",
       "arguments": {}

@@ -98,6 +98,25 @@ Phát ra khi việc bồi hoàn gặp lỗi không thể tự động xử lý:
 - `DateTimeOffset OccurredAtUtc`
 - `string CorrelationId`, `Guid? CausationId`
 
+### 2.8 Nhóm event Trip ↔ Matching (request/reply bất đồng bộ)
+
+Khi `TripLifecycle:MatchingTransport = "Events"`, Trip không gọi `/match` và `/quote` bằng REST nữa mà trao đổi với Matching bằng 6 event dưới đây (xem [luồng Trip ↔ Matching qua event](messaging-operations.md#35-luồng-trip--matching-qua-event-matchingtransport--events)).
+Mọi event đều mang `EventId`, `TripId`, `OccurredAtUtc`, `string CorrelationId`, `Guid? CausationId` (với reply, `CausationId` = `EventId` của request).
+
+| Event | Chiều | Trường nghiệp vụ |
+|:---|:---|:---|
+| `QuoteRequestedV1` | Trip → Matching | `PickupLatitude/Longitude`, `DestinationLatitude/Longitude`, `Mode` |
+| `QuoteReadyV1` | Matching → Trip | `QuoteId`, `Amount`, `Currency`, `DistanceKm`, `EstimatedMinutes`, `CandidateDriverId`, `CandidateDistanceKm` |
+| `QuoteFailedV1` | Matching → Trip | `ReasonCode`: `NoDriverAvailable` hoặc `InvalidRequest` |
+| `DriverMatchRequestedV1` | Trip → Matching | `PickupLatitude/Longitude`, `ExcludedDriverIds` (tối đa 100) |
+| `DriverMatchedV1` | Matching → Trip | `DriverId`, `DistanceKm`, `ExcludedDriverIds` (Matching trả lại nguyên danh sách của request) |
+| `DriverMatchFailedV1` | Matching → Trip | `ReasonCode`: `NoDriverAvailable` hoặc `InvalidRequest` |
+
+Ghi chú thiết kế:
+- `QuoteReadyV1.QuoteId` chính là `EventId` của `QuoteRequestedV1`, nên request được giao lại vẫn ra cùng một quote (idempotent).
+- `DriverMatchedV1.ExcludedDriverIds` giúp Trip nối dài danh sách loại trừ khi tài xế được chọn đã bận, tránh chọn lại đúng người đó.
+- Contract không chứa entity của Trip hay Matching, chỉ chứa dữ liệu thuần.
+
 ---
 
 ## 3. RabbitMQ Topology: Exchanges, Queues và Bindings
@@ -112,14 +131,20 @@ Topology định sẵn tại `infra/rabbitmq/definitions.json`; healthcheck Comp
 | `SwiftRide.Contracts.V1:PaymentCompensationRequestedV1` | `payment-compensation` | PaymentService thực hiện hoàn tiền (`Refund`) |
 | `SwiftRide.Contracts.V1:PaymentRefundedV1` | `trip-payment-refunded` | TripService xác nhận hoàn tiền thành công |
 | `SwiftRide.Contracts.V1:PaymentCompensationFailedV1` | `trip-payment-compensation-failed` | TripService cảnh báo bồi hoàn thất bại |
+| `SwiftRide.Contracts.V1:QuoteRequestedV1` | `matching-quote-requested` | MatchingService tìm tài xế + tạo báo giá cho chuyến mới |
+| `SwiftRide.Contracts.V1:DriverMatchRequestedV1` | `matching-driver-match-requested` | MatchingService tìm tài xế kế tiếp (sau confirm hoặc khi tài xế từ chối) |
+| `SwiftRide.Contracts.V1:QuoteReadyV1` | `trip-quote-ready` | TripService chuyển `Requested` → `Quoted` |
+| `SwiftRide.Contracts.V1:QuoteFailedV1` | `trip-quote-failed` | TripService chuyển `Requested` → `Failed` |
+| `SwiftRide.Contracts.V1:DriverMatchedV1` | `trip-driver-matched` | TripService giữ chỗ tài xế và mở lời mời (`DriverOffered`) |
+| `SwiftRide.Contracts.V1:DriverMatchFailedV1` | `trip-driver-match-failed` | TripService chuyển chuyến đang chờ rematch sang `Failed` |
 | `SwiftRide.Contracts.V1:TripAcceptedV1` | *(Tùy chọn consumer)* | Broadcast sự kiện tài xế nhận chuyến |
 
 ---
 
 ## 4. Kiểm thử Tự động
 
-File kiểm thử `tests/SwiftRide.Api.Tests/Messaging/ContractSerializationTests.cs` (7 tests) đã kiểm chứng:
-1. Serialization & Deserialization round-trip đầy đủ 7 events.
+File kiểm thử `tests/SwiftRide.Api.Tests/Messaging/ContractSerializationTests.cs` đã kiểm chứng (round-trip của 7 event ban đầu; riêng 6 event Matching mới chỉ được thêm vào kiểm tra tên exchange/queue/binding, chưa có test round-trip riêng):
+1. Serialization & Deserialization round-trip 7 events thanh toán/chuyến đi.
 2. Giữ trọn độ chính xác của `Guid`, `DateTimeOffset` UTC, `decimal` tiền tệ VND.
 3. Không làm rò rỉ các domain types hay persistence entity models vào contracts.
 4. Tên exchange và queue khớp chính xác 100% với file topology.

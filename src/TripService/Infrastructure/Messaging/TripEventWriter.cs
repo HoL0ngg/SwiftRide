@@ -34,6 +34,16 @@ public sealed class TripEventWriter : ITripEventWriter
         StageEvent(message.EventId, nameof(PaymentCompensationRequestedV1), message, message.OccurredAtUtc, message.CorrelationId, message.CausationId);
     }
 
+    public void Add(QuoteRequestedV1 message)
+    {
+        StageEvent(message.EventId, nameof(QuoteRequestedV1), message, message.OccurredAtUtc, message.CorrelationId, message.CausationId);
+    }
+
+    public void Add(DriverMatchRequestedV1 message)
+    {
+        StageEvent(message.EventId, nameof(DriverMatchRequestedV1), message, message.OccurredAtUtc, message.CorrelationId, message.CausationId);
+    }
+
     private void StageEvent<T>(Guid eventId, string eventType, T message, DateTimeOffset occurredAt, string correlationId, Guid? causationId)
     {
         var json = JsonSerializer.Serialize(message, JsonOptions);

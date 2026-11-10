@@ -6,7 +6,7 @@ Tài liệu này hướng dẫn chi tiết quy trình vận hành, giám sát h�
 
 ## 1. Tổng Quan Kiến Trúc Topology & Hàng Đợi (Queues)
 
-Hệ thống SwiftRide áp dụng kiến trúc Event-Driven giữa hai service nghiệp vụ chính: **TripService** và **PaymentService**.
+Hệ thống SwiftRide áp dụng kiến trúc Event-Driven giữa ba service nghiệp vụ: **TripService**, **PaymentService** và **MatchingService** (Matching tham gia khi bật `TripLifecycle:MatchingTransport = "Events"`, xem mục 3.5).
 
 Tất cả các exchange, queue bền vững (durable) và routing key được khởi tạo tự động thông qua cấu hình `infra/rabbitmq/definitions.json` và cấu hình receive endpoint trong code:
 
@@ -18,6 +18,12 @@ Tất cả các exchange, queue bền vững (durable) và routing key được 
 | `trip-payment-failed` | `trip-payment-failed_error` | `PaymentFailedConsumer` (TripService) | `PaymentFailedV1` |
 | `trip-payment-refunded` | `trip-payment-refunded_error` | `PaymentRefundedConsumer` (TripService) | `PaymentRefundedV1` |
 | `trip-payment-compensation-failed` | `trip-payment-compensation-failed_error` | `PaymentCompensationFailedConsumer` (TripService) | `PaymentCompensationFailedV1` |
+| `matching-quote-requested` | `matching-quote-requested_error` | `QuoteRequestedConsumer` (MatchingService) | `QuoteRequestedV1` |
+| `matching-driver-match-requested` | `matching-driver-match-requested_error` | `DriverMatchRequestedConsumer` (MatchingService) | `DriverMatchRequestedV1` |
+| `trip-quote-ready` | `trip-quote-ready_error` | `QuoteReadyConsumer` (TripService) | `QuoteReadyV1` |
+| `trip-quote-failed` | `trip-quote-failed_error` | `QuoteFailedConsumer` (TripService) | `QuoteFailedV1` |
+| `trip-driver-matched` | `trip-driver-matched_error` | `DriverMatchedConsumer` (TripService) | `DriverMatchedV1` |
+| `trip-driver-match-failed` | `trip-driver-match-failed_error` | `DriverMatchFailedConsumer` (TripService) | `DriverMatchFailedV1` |
 
 Mỗi hàng đợi được gán kèm tự động một hàng đợi phụ với hậu tố `_error` (Dead Letter Queue do MassTransit quản lý). Khi một thông điệp gặp lỗi không thể khắc phục hoặc vượt quá hạn mức retry, MassTransit sẽ chuyển thông điệp sang hàng đợi `_error` mà không bao giờ âm thầm nuốt lỗi (silently drop).
 
@@ -139,6 +145,40 @@ Hệ thống SwiftRide hỗ trợ snapshot cơ chế thanh toán độc lập tr
   - Mỗi chuyến đi lưu snapshot cứng phương thức vận chuyển ngay tại thời điểm tạo (`TripRecord.PaymentTransport`).
   - Worker `PendingPaymentWorker` chỉ claim và gọi REST cho các chuyến đi có `PaymentTransport != "Events"`.
   - Nhờ vậy, việc thay đổi cấu hình mặc định trong file cấu hình không bao giờ gây xung đột, gọi kép hay tranh chấp đường truyền trên các chuyến đi đang chạy dở dang.
+
+---
+
+### 3.5. Luồng Trip ↔ Matching qua event (`MatchingTransport = Events`)
+
+Trip và Matching có thể trao đổi hoàn toàn qua RabbitMQ thay cho REST `/match`, `/quote` (cách "B": bất đồng bộ hoàn toàn, không chờ trả lời trong request).
+
+**Bật/tắt:** `TripLifecycle:MatchingTransport` = `Rest` (mặc định) hoặc `Events` (biến môi trường `TRIP_LIFECYCLE_MATCHING_TRANSPORT`). `Events` cần `MESSAGING_TRANSPORT=RabbitMQ` ở **cả** `trip-service` và `matching-service`, và chạy compose với `--profile messaging`. Nếu cấu hình `Events` nhưng messaging của Trip đang `None`, Trip tự quay về REST (không phát event). Trip → Payment không đổi, vẫn do `PaymentTransport` quyết định riêng.
+
+```text
+POST /trips ─► Trip lưu Requested + outbox(QuoteRequestedV1) trong 1 transaction ─► 202 Accepted (status Requested)
+   QuoteRequestedV1 ─► Matching: tìm tài xế + tạo quote ─► QuoteReadyV1 ─► Trip: Requested → Quoted
+                                                       └► QuoteFailedV1 ─► Trip: Requested → Failed (nhả rider)
+
+POST /trips/{id}/confirm-quote ─► Trip: Quoted → DriverOffered (chốt giá, chưa có tài xế) + outbox(DriverMatchRequestedV1)
+   DriverMatchRequestedV1 ─► Matching ─► DriverMatchedV1 ─► Trip giữ chỗ tài xế, mở lời mời cho tài xế
+                                    └──► DriverMatchFailedV1 ─► Trip: Failed (nhả rider)
+
+Tài xế từ chối (≤ k) ─► Trip lưu DriverMatchRequestedV1 (loại các tài xế đã từ chối) ─► lặp lại như trên
+Tài xế được chọn đang bận ─► Trip phát DriverMatchRequestedV1 mới, thêm tài xế đó vào danh sách loại trừ
+```
+
+**Quan sát từ client:** `POST /trips` trả `202 Accepted` với trạng thái `Requested`; rider poll `GET /trips/{id}` (hoặc trip hiện tại) cho tới khi thành `Quoted` hoặc `Failed`. Sau `confirm-quote`, trạng thái là `DriverOffered` nhưng `offeredDriverId` còn rỗng (đang chờ rematch) cho tới khi có `DriverMatchedV1`. Driver chỉ thấy lời mời khi đã có tài xế được gán.
+
+**Độ tin cậy & idempotency:**
+- Phía Trip: mọi event phát đi đều qua **Transactional Outbox** (cùng transaction với thay đổi trạng thái). Consumer ghi inbox `(ConsumerName, MessageId)` **cùng transaction** với thay đổi chuyến; giao trùng sẽ bị bỏ qua. Reply "cũ" hoặc trùng (chuyến đã hủy, đã có lời mời, đã sang trạng thái khác) bị bỏ qua và ghi chú vào inbox.
+- Phía Matching: consumer chỉ đọc vị trí tài xế (an toàn khi chạy lại) và `QuoteId` = `EventId` của request nên giao lại vẫn ra cùng một quote (`MatchingRepository.AddAsync` bỏ qua nếu quote đã có). Matching **không có outbox**, trả lời bằng `Publish` ở bước cuối của consumer; nếu publish lỗi, MassTransit retry cả consumer.
+- Retry: dùng `BoundedMessageRetryPolicy` (Matching: 3 lần, 5–60 giây; Trip giữ cấu hình hiện có). Lỗi nghiệp vụ vĩnh viễn (tọa độ sai, mode không hỗ trợ) trả `*FailedV1` với `ReasonCode=InvalidRequest` thay vì retry.
+- Tranh chấp giữ chỗ tài xế (unique index `ActiveDriverAssignments`) làm `DbUpdateException` nổi lên để broker retry trong scope mới; lúc đó `TryClaimDriver` thấy tài xế bận và yêu cầu match khác. Số lần tài xế bận tối đa bằng `MaxDriverRejections`, vượt thì chuyến `Failed`.
+
+**Giới hạn đã biết (chưa xử lý):**
+- Nếu một reply mất hẳn (message vào `_error`, hoặc Matching không chạy quá lâu), chuyến sẽ nằm ở `Requested` / `DriverOffered` chờ rematch cho tới khi replay từ `_error` (mục 3.2) hoặc rider hủy. Chưa có worker tự hết hạn các chuyến này (REST có `PendingTripWorker` khôi phục, đường events thì chưa).
+- Hai reply `DriverMatchedV1` khác `EventId` cho cùng một lần rematch (ví dụ do request bị gửi trùng) có thể làm Trip nhận reply thứ hai khi chuyến lại ở trạng thái chờ rematch; trường hợp này hiếm và hậu quả chỉ là bỏ lỡ một lời mời.
+- Rollback: đặt lại `TRIP_LIFECYCLE_MATCHING_TRANSPORT=Rest`. Chuyến đang chờ reply trong lúc đổi cấu hình cần replay hoặc hủy thủ công (transport matching không được snapshot theo chuyến như `PaymentTransport`).
 
 ---
 

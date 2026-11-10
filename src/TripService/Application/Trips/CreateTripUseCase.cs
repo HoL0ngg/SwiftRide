@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
+using SwiftRide.Contracts.V1;
 using SwiftRide.TripService.Application.Abstractions;
 using SwiftRide.TripService.Application.Exceptions;
 using SwiftRide.TripService.Domain;
@@ -96,17 +97,38 @@ public sealed class CreateTripUseCase(
         writer.Add(context);
         assignmentStore.ClaimRider(cmd.Actor.Id, trip.Id);
 
+        // Event-driven matching: the quote request is staged in the outbox in the same transaction as the trip,
+        // and the matching worker must not pick this trip up over REST, so the receipt is completed right away.
+        var useEventMatching = _lifecycleOptions.UsesEventMatching && eventWriter is { IsAvailable: true };
+
         var receipt = new CommandReceipt(
             scope.ToScopeString(),
             cmd.CommandKey,
             requestHash,
             trip.Id.ToString("D"),
-            "pending",
+            useEventMatching ? "completed" : "pending",
             0,
             null,
             now,
             now);
         receiptStore.Add(receipt);
+
+        if (useEventMatching)
+        {
+            eventWriter!.Add(new QuoteRequestedV1(
+                EventId: Guid.NewGuid(),
+                TripId: trip.Id,
+                PickupLatitude: cmd.Pickup.Latitude,
+                PickupLongitude: cmd.Pickup.Longitude,
+                DestinationLatitude: cmd.Destination.Latitude,
+                DestinationLongitude: cmd.Destination.Longitude,
+                Mode: context.PricingMode,
+                OccurredAtUtc: now,
+                CorrelationId: $"trip-{trip.Id:D}-quote"));
+
+            await unitOfWork.SaveAsync(ct);
+            return new CreateTripResult(TripMapper.ToReadModel(context), IsReplay: false, IsPendingWork: true);
+        }
 
         await unitOfWork.SaveAsync(ct);
 
