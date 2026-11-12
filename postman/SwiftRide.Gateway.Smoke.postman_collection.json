@@ -1,0 +1,900 @@
+{
+  "info": {
+    "name": "SwiftRide Gateway Smoke",
+    "description": "DevelopmentJwt smoke test through YARP only. See docs/api-reference.md. Creates demo records using mock payments. Run all requests in order, one iteration, delay 1000 ms, request timeout 15000 ms. Tokens are run-local.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{base_url}}/health",
+        "description": "See docs/api-reference.md. Run in collection order."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const runId = pm.variables.replaceIn('{{$guid}}');",
+              "pm.variables.set('rider_id', 'pm-rider-' + runId);",
+              "pm.variables.set('driver_id', 'pm-driver-' + runId);",
+              "pm.variables.set('create_key', 'create-' + runId);",
+              "pm.variables.set('dropoff_key', 'dropoff-' + runId);",
+              "pm.variables.set('quote_polls', 0);",
+              "pm.variables.set('paid_polls', 0);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"01 Health\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Rider token",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{base_url}}/dev/token?userId={{rider_id}}&role=rider",
+        "description": "See docs/api-reference.md. Run in collection order."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"02 Rider token\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const token = pm.response.json().access_token;",
+              "pm.expect(token).to.be.a('string').and.not.empty;",
+              "pm.variables.set('rider_token', token);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Driver token",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{base_url}}/dev/token?userId={{driver_id}}&role=driver",
+        "description": "See docs/api-reference.md. Run in collection order."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"03 Driver token\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const token = pm.response.json().access_token;",
+              "pm.expect(token).to.be.a('string').and.not.empty;",
+              "pm.variables.set('initial_driver_token', token);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Driver online",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{initial_driver_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/drivers/{{driver_id}}/location",
+        "description": "See docs/api-reference.md. Run in collection order.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"latitude\": 10.7725,\n  \"longitude\": 106.698,\n  \"isOnline\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"04 Driver online\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(204);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Rider forbidden on driver route",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{rider_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/drivers/{{driver_id}}/location",
+        "description": "See docs/api-reference.md. Run in collection order.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"latitude\": 10.7725,\n  \"longitude\": 106.698,\n  \"isOnline\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"05 Rider forbidden on driver route\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(403);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Missing JWT rejected",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{base_url}}/trips/current",
+        "description": "See docs/api-reference.md. Run in collection order."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"06 Missing JWT rejected\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(401);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Create trip",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{create_key}}"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{rider_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips",
+        "description": "See docs/api-reference.md. Run in collection order.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pickup\": {\n    \"latitude\": 10.7725,\n    \"longitude\": 106.698\n  },\n  \"pickupName\": \"Chợ Bến Thành\",\n  \"pickupAddress\": \"Quận 1\",\n  \"destination\": {\n    \"latitude\": 10.7951,\n    \"longitude\": 106.7219\n  },\n  \"destinationName\": \"Landmark 81\",\n  \"destinationAddress\": \"Bình Thạnh\",\n  \"paymentMethod\": \"wallet\",\n  \"mode\": \"standard\",\n  \"paymentTransport\": \"Rest\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"07 Create trip\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.be.oneOf([201, 202]);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.be.a('string').and.not.empty;",
+              "pm.expect(trip.status).to.be.oneOf(['Requested', 'Quoted']);",
+              "pm.variables.set('trip_id', trip.id);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Wait for quote",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{rider_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}",
+        "description": "See docs/api-reference.md. Run in collection order."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"08 Wait for quote\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
+              "pm.expect(trip.status).to.be.oneOf(['Requested', 'Quoted']);",
+              "if (trip.status === 'Requested') {",
+              "  const count = Number(pm.variables.get('quote_polls')) + 1;",
+              "  pm.variables.set('quote_polls', count);",
+              "  pm.expect(count, 'Quote polling limit exceeded').to.be.below(30);",
+              "  pm.execution.setNextRequest(pm.info.requestName);",
+              "} else {",
+              "  pm.expect(trip.quoteId).to.be.a('string').and.not.empty;",
+              "  pm.expect(trip.fareAmount).to.match(/^\\d+$/);",
+              "  pm.expect(trip.currency).to.eql('VND');",
+              "  pm.variables.set('quote_id', trip.quoteId);",
+              "  pm.variables.set('fare_amount', trip.fareAmount);",
+              "}",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Replay create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{create_key}}"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{rider_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips",
+        "description": "See docs/api-reference.md. Run in collection order.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pickup\": {\n    \"latitude\": 10.7725,\n    \"longitude\": 106.698\n  },\n  \"pickupName\": \"Chợ Bến Thành\",\n  \"pickupAddress\": \"Quận 1\",\n  \"destination\": {\n    \"latitude\": 10.7951,\n    \"longitude\": 106.7219\n  },\n  \"destinationName\": \"Landmark 81\",\n  \"destinationAddress\": \"Bình Thạnh\",\n  \"paymentMethod\": \"wallet\",\n  \"mode\": \"standard\",\n  \"paymentTransport\": \"Rest\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"09 Replay create\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.quoteId).to.eql(pm.variables.get('quote_id'));",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 Changed payload conflicts",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{create_key}}"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{rider_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips",
+        "description": "See docs/api-reference.md. Run in collection order.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pickup\": {\n    \"latitude\": 10.7725,\n    \"longitude\": 106.698\n  },\n  \"pickupName\": \"Chợ Bến Thành\",\n  \"pickupAddress\": \"Quận 1\",\n  \"destination\": {\n    \"latitude\": 10.7951,\n    \"longitude\": 106.7219\n  },\n  \"destinationName\": \"Landmark 81\",\n  \"destinationAddress\": \"Bình Thạnh\",\n  \"paymentMethod\": \"card\",\n  \"mode\": \"standard\",\n  \"paymentTransport\": \"Rest\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"10 Changed payload conflicts\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(409);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 Confirm quote",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{rider_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}/confirm-quote",
+        "description": "See docs/api-reference.md. Run in collection order.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"quoteId\": \"{{quote_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"11 Confirm quote\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.eql('DriverOffered');",
+              "pm.expect(trip.offeredDriverId).to.be.a('string').and.not.empty;",
+              "pm.variables.set('offered_driver_id', trip.offeredDriverId);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 Offered driver token",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{base_url}}/dev/token?userId={{offered_driver_id}}&role=driver",
+        "description": "See docs/api-reference.md. Run in collection order."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"12 Offered driver token\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const token = pm.response.json().access_token;",
+              "pm.expect(token).to.be.a('string').and.not.empty;",
+              "pm.variables.set('driver_token', token);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Driver accepts",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{driver_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}/driver-accept",
+        "description": "See docs/api-reference.md. Run in collection order."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"13 Driver accepts\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.eql('DriverAccepted');",
+              "pm.expect(trip.assignedDriverId).to.eql(pm.variables.get('offered_driver_id'));",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 En route",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{driver_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}/en-route",
+        "description": "See docs/api-reference.md. Run in collection order."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"14 En route\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.eql('EnRoute');",
+              "pm.expect(trip.assignedDriverId).to.eql(pm.variables.get('offered_driver_id'));",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 Pickup",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{driver_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}/pickup",
+        "description": "See docs/api-reference.md. Run in collection order."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"15 Pickup\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.eql('PickedUp');",
+              "pm.expect(trip.assignedDriverId).to.eql(pm.variables.get('offered_driver_id'));",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 Dropoff",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "{{dropoff_key}}"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{driver_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}/dropoff",
+        "description": "See docs/api-reference.md. Run in collection order."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"16 Dropoff\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.be.oneOf(['PaymentPending', 'Paid']);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 Replay dropoff",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "{{dropoff_key}}"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{driver_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}/dropoff",
+        "description": "See docs/api-reference.md. Run in collection order."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"17 Replay dropoff\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.be.oneOf(['PaymentPending', 'Paid']);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 Wait for Paid",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{rider_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}",
+        "description": "See docs/api-reference.md. Run in collection order."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"18 Wait for Paid\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.be.oneOf(['PaymentPending', 'Paid']);",
+              "if (trip.status !== 'Paid') {",
+              "  const count = Number(pm.variables.get('paid_polls')) + 1;",
+              "  pm.variables.set('paid_polls', count);",
+              "  pm.expect(count, 'Payment polling limit exceeded').to.be.below(30);",
+              "  pm.execution.setNextRequest(pm.info.requestName);",
+              "} else {",
+              "  pm.expect(trip.status).to.eql('Paid');",
+              "}",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 Demo driver offline",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{initial_driver_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/drivers/{{driver_id}}/location",
+        "description": "See docs/api-reference.md. Run in collection order.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"latitude\": 10.7725,\n  \"longitude\": 106.698,\n  \"isOnline\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"19 Demo driver offline\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(204);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -34,6 +34,8 @@ SwiftRide.sln
 Quy tắc kiến trúc: [AGENTS.md](AGENTS.md). Đề bài: [docs/requirements.md](docs/requirements.md). Tài liệu chi tiết: [docs/](docs/).
 
 Tài liệu hệ thống:
+- [Tài liệu HTTP API: method, payload, response và kiểm thử Postman](docs/api-reference.md)
+- [Xem thông tin RabbitMQ trên terminal và Postman Console](docs/rabbitmq-terminal-postman.md)
 - [Báo cáo Trạng thái Triển khai Toàn diện](docs/implementation-status.md)
 - [Hướng dẫn kiểm thử & Vận hành luồng đặt xe End-to-End](docs/end-to-end-booking.md)
 - [Hợp đồng Integration Event Contracts V1](docs/messaging-contracts-v1.md)
