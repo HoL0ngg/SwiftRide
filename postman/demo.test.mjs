@@ -8,6 +8,21 @@ const load = name => JSON.parse(readFileSync(new URL(name, import.meta.url)));
 const flatten = items => items.flatMap(item => item.item ? flatten(item.item) : [item]);
 const smoke = load('./SwiftRide.Gateway.Smoke.postman_collection.json');
 
+test('invalid pickup is tested after driver assignment and before en-route', () => {
+  const requests = load('./SwiftRide.Gateway.Demo.postman_collection.json').item[0].item;
+  const accept = requests.findIndex(r => r.name === '01 driver-accept');
+  const pickup = requests.findIndex(r => r.name === '01 Invalid pickup');
+  const enRoute = requests.findIndex(r => r.name === '01 en-route');
+  assert.ok(accept >= 0 && accept < pickup && pickup < enRoute,
+    'Before acceptance pickup fails authorization (403), so it cannot test invalid state (409)');
+});
+
+test('Runner request names are unique so polling cannot jump to a different step', () => {
+  const requests = flatten(load('./SwiftRide.Gateway.Demo.postman_collection.json').item);
+  const names = requests.map(request => request.name);
+  assert.equal(new Set(names).size, names.length);
+});
+
 test('smoke waits for an asynchronous driver offer after confirming the quote', () => {
   const wait = smoke.item.find(item => item.name === '11b Wait for driver');
   assert.ok(wait, 'Missing driver polling request');

@@ -46,6 +46,10 @@ Mỗi lần đọc Postman lấy tối đa 100 message và requeue. Nếu queue 
 
 Chạy **toàn bộ một folder** trong Runner, **1 iteration**, **delay 1000 ms**, **request timeout 20000 ms**. Có thể chạy toàn collection theo thứ tự. Script `setNextRequest` chỉ điều khiển luồng trong Runner/CLI, không tự polling khi bấm Send đơn lẻ. Mỗi polling có tối đa 60 lần; thất bại assertion thì dừng run.
 
+Khi cập nhật file collection trong repository, import lại và thay thế bản cũ trong Postman trước khi chạy. Folder 01 kiểm tra `Invalid pickup` **sau `driver-accept`, trước `en-route`** để nhận `409` do sai trạng thái. Gọi pickup trước accept nhận `403` vì tài xế chưa được giao chuyến; đó là kiểm tra quyền, không phải lỗi backend.
+
+Tên request trong Demo phải duy nhất vì polling dùng `setNextRequest(pm.info.requestName)`. Folder 09 có hai bước riêng: `09 Wait for driver` trước khi từ chối và `09 Wait for Failed after rejection` sau khi từ chối. Không đổi chúng về cùng một tên.
+
 | Folder | Thao tác và kết quả mong đợi | Event nổi bật khi Matching/Payment dùng Events |
 |---|---|---|
 | `01 Success...` | Tạo → quote → confirm → driver accept → en-route → pickup → dropoff → `Paid`; kiểm tra replay, conflict, sai quyền, pickup sai thứ tự và hủy quá muộn | `QuoteRequested`, `QuoteReady`, `DriverMatchRequested`, `DriverMatched`, `TripAccepted`, `RideCompleted`, `PaymentSettled` |
@@ -62,6 +66,8 @@ Chạy **toàn bộ một folder** trong Runner, **1 iteration**, **delay 1000 m
 Collection dùng rider/driver mới theo UUID cho mỗi folder. Tọa độ demo ở kinh độ −140 và các vĩ độ riêng, cách xa seed TP.HCM để kiểm soát kết quả; folder không có tài xế dùng vĩ độ 20. Không tắt tài xế hiện có. Chạy tuần tự, không chạy hai lần cùng một folder đồng thời. Nếu database có tài xế khác tại chính vùng demo, kết quả có thể khác; dùng database demo riêng để cô lập hoàn toàn.
 
 Vị trí tài xế mặc định hết hạn sau 5 phút. Nếu dừng thuyết trình lâu trước confirm/rematch, chạy lại folder từ đầu hoặc cập nhật lại vị trí. Nếu assertion thất bại giữa chừng, bước offline cuối folder chưa chắc đã chạy; các tài xế demo sẽ tự hết hiệu lực matching khi vị trí cũ.
+
+Nếu vừa online nhưng quote vẫn `Failed/NoDriverAvailable`, kiểm tra đồng hồ Windows/Docker. Matching chỉ nhận vị trí có `updated_at` không ở tương lai và chưa hết hạn. Đã quan sát vị trí ghi `15:49:33 UTC` nhưng consumer xử lý ở `15:48:35 UTC`; một lần khác vị trí ghi `16:04:21 UTC` nhưng consumer xử lý ở `16:03:23 UTC`. Cả hai bị loại đúng quy tắc vì timestamp ở tương lai. Đo đồng thời cho thấy Windows và Docker lệch khoảng 59 giây; bảng không có trigger sửa timestamp và Gateway trỏ đúng Matching container. Đồng bộ lại giờ hệ điều hành/Docker trước khi demo rồi chạy lại folder từ đầu. Không sửa timestamp DB hoặc nới bộ lọc để che lỗi đồng hồ.
 
 Đặt environment `payment_transport=Rest` nếu muốn thử cùng các kịch bản bằng thanh toán REST. Matching vẫn do cấu hình server quyết định, không do collection quyết định. Chỉ bật RabbitMQ không chứng minh một chuyến đang dùng Events; bản sao `QuoteRequestedV1` và `RideCompletedV1` mang đúng `tripId` là bằng chứng rõ hơn.
 
