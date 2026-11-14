@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "SwiftRide Gateway Smoke",
-    "description": "DevelopmentJwt smoke test through YARP only. See docs/api-reference.md. Creates demo records using mock payments. Run all requests in order, one iteration, delay 1000 ms, request timeout 15000 ms. Tokens are run-local.",
+    "name": "SwiftRide Gateway - Matching Events + Payment Events",
+    "description": "RabbitMQ end-to-end scenario through YARP using DevelopmentJwt and mock payments. Requires Messaging:Transport=RabbitMQ on all three services, TripLifecycle:MatchingTransport=Events, and the messaging Compose profile. See docs/api-reference.md section 7. Select a Postman environment. Tokens, actor IDs, idempotency keys and trip snapshots persist in that environment for independent Send requests. Health does not reset the saved session. Use a fresh environment for a new full scenario. For Collection Runner, run all 20 requests in order, one iteration, delay 1000 ms, request timeout 15000 ms. Three polling steps stop after 30 pending responses each. Polling counters are run-local. Keep token values local; do not share or export populated environments. Verify broker activity and payment/ledger separately; HTTP results alone do not prove RabbitMQ delivery or a single charge.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -21,7 +21,7 @@
           "type": "noauth"
         },
         "url": "{{base_url}}/health",
-        "description": "See docs/api-reference.md. Run in collection order."
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow."
       },
       "event": [
         {
@@ -29,13 +29,9 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "const runId = pm.variables.replaceIn('{{$guid}}');",
-              "pm.variables.set('rider_id', 'pm-rider-' + runId);",
-              "pm.variables.set('driver_id', 'pm-driver-' + runId);",
-              "pm.variables.set('create_key', 'create-' + runId);",
-              "pm.variables.set('dropoff_key', 'dropoff-' + runId);",
               "pm.variables.set('quote_polls', 0);",
-              "pm.variables.set('paid_polls', 0);"
+              "pm.variables.set('paid_polls', 0);",
+              "pm.variables.set('driver_polls', 0);"
             ]
           }
         },
@@ -66,7 +62,7 @@
           "type": "noauth"
         },
         "url": "{{base_url}}/dev/token?userId={{rider_id}}&role=rider",
-        "description": "See docs/api-reference.md. Run in collection order."
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow."
       },
       "event": [
         {
@@ -79,7 +75,7 @@
               "pm.expect(pm.response.code).to.eql(200);",
               "const token = pm.response.json().access_token;",
               "pm.expect(token).to.be.a('string').and.not.empty;",
-              "pm.variables.set('rider_token', token);",
+              "pm.environment.set('rider_token', token);",
               "  } catch (error) {",
               "    pm.execution.setNextRequest(null);",
               "    throw error;",
@@ -99,7 +95,7 @@
           "type": "noauth"
         },
         "url": "{{base_url}}/dev/token?userId={{driver_id}}&role=driver",
-        "description": "See docs/api-reference.md. Run in collection order."
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow."
       },
       "event": [
         {
@@ -112,7 +108,8 @@
               "pm.expect(pm.response.code).to.eql(200);",
               "const token = pm.response.json().access_token;",
               "pm.expect(token).to.be.a('string').and.not.empty;",
-              "pm.variables.set('initial_driver_token', token);",
+              "pm.environment.set('initial_driver_token', token);",
+              "pm.environment.set('driver_token', token);",
               "  } catch (error) {",
               "    pm.execution.setNextRequest(null);",
               "    throw error;",
@@ -144,7 +141,7 @@
           ]
         },
         "url": "{{base_url}}/drivers/{{driver_id}}/location",
-        "description": "See docs/api-reference.md. Run in collection order.",
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"latitude\": 10.7725,\n  \"longitude\": 106.698,\n  \"isOnline\": true\n}",
@@ -195,7 +192,7 @@
           ]
         },
         "url": "{{base_url}}/drivers/{{driver_id}}/location",
-        "description": "See docs/api-reference.md. Run in collection order.",
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"latitude\": 10.7725,\n  \"longitude\": 106.698,\n  \"isOnline\": true\n}",
@@ -234,7 +231,7 @@
           "type": "noauth"
         },
         "url": "{{base_url}}/trips/current",
-        "description": "See docs/api-reference.md. Run in collection order."
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow."
       },
       "event": [
         {
@@ -280,10 +277,10 @@
           ]
         },
         "url": "{{base_url}}/trips",
-        "description": "See docs/api-reference.md. Run in collection order.",
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"pickup\": {\n    \"latitude\": 10.7725,\n    \"longitude\": 106.698\n  },\n  \"pickupName\": \"Chợ Bến Thành\",\n  \"pickupAddress\": \"Quận 1\",\n  \"destination\": {\n    \"latitude\": 10.7951,\n    \"longitude\": 106.7219\n  },\n  \"destinationName\": \"Landmark 81\",\n  \"destinationAddress\": \"Bình Thạnh\",\n  \"paymentMethod\": \"wallet\",\n  \"mode\": \"standard\",\n  \"paymentTransport\": \"Rest\"\n}",
+          "raw": "{\n  \"pickup\": {\n    \"latitude\": 10.7725,\n    \"longitude\": 106.698\n  },\n  \"pickupName\": \"Chợ Bến Thành\",\n  \"pickupAddress\": \"Quận 1\",\n  \"destination\": {\n    \"latitude\": 10.7951,\n    \"longitude\": 106.7219\n  },\n  \"destinationName\": \"Landmark 81\",\n  \"destinationAddress\": \"Bình Thạnh\",\n  \"paymentMethod\": \"wallet\",\n  \"mode\": \"standard\",\n  \"paymentTransport\": \"Events\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -299,11 +296,16 @@
             "exec": [
               "pm.test(\"07 Create trip\", function () {",
               "  try {",
-              "pm.expect(pm.response.code).to.be.oneOf([201, 202]);",
+              "pm.expect(pm.response.code, 'Expected 202 for event matching or 200 for a known replay; 201 indicates synchronous matching').to.be.oneOf([200, 202]);",
               "const trip = pm.response.json();",
               "pm.expect(trip.id).to.be.a('string').and.not.empty;",
-              "pm.expect(trip.status).to.be.oneOf(['Requested', 'Quoted']);",
-              "pm.variables.set('trip_id', trip.id);",
+              "if (pm.response.code === 200) {",
+              "  pm.expect(trip.id, 'Replay must match trip_id saved in the selected environment').to.eql(pm.environment.get('trip_id'));",
+              "  pm.expect(trip.status).to.be.oneOf(['Quoted', 'DriverOffered', 'DriverAccepted', 'EnRoute', 'PickedUp', 'DroppedOff', 'PaymentPending', 'Paid', 'Cancelled', 'Failed']);",
+              "} else {",
+              "  pm.expect(trip.status).to.eql('Requested');",
+              "}",
+              "pm.environment.set('trip_id', trip.id);",
               "  } catch (error) {",
               "    pm.execution.setNextRequest(null);",
               "    throw error;",
@@ -330,7 +332,7 @@
           ]
         },
         "url": "{{base_url}}/trips/{{trip_id}}",
-        "description": "See docs/api-reference.md. Run in collection order."
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow."
       },
       "event": [
         {
@@ -342,10 +344,10 @@
               "  try {",
               "pm.expect(pm.response.code).to.eql(200);",
               "const trip = pm.response.json();",
-              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
+              "pm.expect(trip.id).to.eql(pm.environment.get('trip_id'));",
               "pm.expect(trip.status).to.be.oneOf(['Requested', 'Quoted']);",
               "if (trip.status === 'Requested') {",
-              "  const count = Number(pm.variables.get('quote_polls')) + 1;",
+              "  const count = Number(pm.variables.get('quote_polls') || 0) + 1;",
               "  pm.variables.set('quote_polls', count);",
               "  pm.expect(count, 'Quote polling limit exceeded').to.be.below(30);",
               "  pm.execution.setNextRequest(pm.info.requestName);",
@@ -353,8 +355,8 @@
               "  pm.expect(trip.quoteId).to.be.a('string').and.not.empty;",
               "  pm.expect(trip.fareAmount).to.match(/^\\d+$/);",
               "  pm.expect(trip.currency).to.eql('VND');",
-              "  pm.variables.set('quote_id', trip.quoteId);",
-              "  pm.variables.set('fare_amount', trip.fareAmount);",
+              "  pm.environment.set('quote_id', trip.quoteId);",
+              "  pm.environment.set('fare_amount', trip.fareAmount);",
               "}",
               "  } catch (error) {",
               "    pm.execution.setNextRequest(null);",
@@ -391,10 +393,10 @@
           ]
         },
         "url": "{{base_url}}/trips",
-        "description": "See docs/api-reference.md. Run in collection order.",
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"pickup\": {\n    \"latitude\": 10.7725,\n    \"longitude\": 106.698\n  },\n  \"pickupName\": \"Chợ Bến Thành\",\n  \"pickupAddress\": \"Quận 1\",\n  \"destination\": {\n    \"latitude\": 10.7951,\n    \"longitude\": 106.7219\n  },\n  \"destinationName\": \"Landmark 81\",\n  \"destinationAddress\": \"Bình Thạnh\",\n  \"paymentMethod\": \"wallet\",\n  \"mode\": \"standard\",\n  \"paymentTransport\": \"Rest\"\n}",
+          "raw": "{\n  \"pickup\": {\n    \"latitude\": 10.7725,\n    \"longitude\": 106.698\n  },\n  \"pickupName\": \"Chợ Bến Thành\",\n  \"pickupAddress\": \"Quận 1\",\n  \"destination\": {\n    \"latitude\": 10.7951,\n    \"longitude\": 106.7219\n  },\n  \"destinationName\": \"Landmark 81\",\n  \"destinationAddress\": \"Bình Thạnh\",\n  \"paymentMethod\": \"wallet\",\n  \"mode\": \"standard\",\n  \"paymentTransport\": \"Events\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -412,10 +414,10 @@
               "  try {",
               "pm.expect(pm.response.code).to.eql(200);",
               "const trip = pm.response.json();",
-              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+              "pm.expect(trip.id).to.eql(pm.environment.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.environment.get('fare_amount'));",
               "pm.expect(trip.currency).to.eql('VND');",
-              "pm.expect(trip.quoteId).to.eql(pm.variables.get('quote_id'));",
+              "pm.expect(trip.quoteId).to.eql(pm.environment.get('quote_id'));",
               "  } catch (error) {",
               "    pm.execution.setNextRequest(null);",
               "    throw error;",
@@ -451,10 +453,10 @@
           ]
         },
         "url": "{{base_url}}/trips",
-        "description": "See docs/api-reference.md. Run in collection order.",
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"pickup\": {\n    \"latitude\": 10.7725,\n    \"longitude\": 106.698\n  },\n  \"pickupName\": \"Chợ Bến Thành\",\n  \"pickupAddress\": \"Quận 1\",\n  \"destination\": {\n    \"latitude\": 10.7951,\n    \"longitude\": 106.7219\n  },\n  \"destinationName\": \"Landmark 81\",\n  \"destinationAddress\": \"Bình Thạnh\",\n  \"paymentMethod\": \"card\",\n  \"mode\": \"standard\",\n  \"paymentTransport\": \"Rest\"\n}",
+          "raw": "{\n  \"pickup\": {\n    \"latitude\": 10.7725,\n    \"longitude\": 106.698\n  },\n  \"pickupName\": \"Chợ Bến Thành\",\n  \"pickupAddress\": \"Quận 1\",\n  \"destination\": {\n    \"latitude\": 10.7951,\n    \"longitude\": 106.7219\n  },\n  \"destinationName\": \"Landmark 81\",\n  \"destinationAddress\": \"Bình Thạnh\",\n  \"paymentMethod\": \"card\",\n  \"mode\": \"standard\",\n  \"paymentTransport\": \"Events\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -502,7 +504,7 @@
           ]
         },
         "url": "{{base_url}}/trips/{{trip_id}}/confirm-quote",
-        "description": "See docs/api-reference.md. Run in collection order.",
+        "description": "Locks the fare and stages DriverMatchRequestedV1. The driver may still be null; the next request waits for DriverMatchedV1.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"quoteId\": \"{{quote_id}}\"\n}",
@@ -523,12 +525,10 @@
               "  try {",
               "pm.expect(pm.response.code).to.eql(200);",
               "const trip = pm.response.json();",
-              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+              "pm.expect(trip.id).to.eql(pm.environment.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.environment.get('fare_amount'));",
               "pm.expect(trip.currency).to.eql('VND');",
               "pm.expect(trip.status).to.eql('DriverOffered');",
-              "pm.expect(trip.offeredDriverId).to.be.a('string').and.not.empty;",
-              "pm.variables.set('offered_driver_id', trip.offeredDriverId);",
               "  } catch (error) {",
               "    pm.execution.setNextRequest(null);",
               "    throw error;",
@@ -540,263 +540,7 @@
       ]
     },
     {
-      "name": "12 Offered driver token",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "auth": {
-          "type": "noauth"
-        },
-        "url": "{{base_url}}/dev/token?userId={{offered_driver_id}}&role=driver",
-        "description": "See docs/api-reference.md. Run in collection order."
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test(\"12 Offered driver token\", function () {",
-              "  try {",
-              "pm.expect(pm.response.code).to.eql(200);",
-              "const token = pm.response.json().access_token;",
-              "pm.expect(token).to.be.a('string').and.not.empty;",
-              "pm.variables.set('driver_token', token);",
-              "  } catch (error) {",
-              "    pm.execution.setNextRequest(null);",
-              "    throw error;",
-              "  }",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "13 Driver accepts",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{driver_token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": "{{base_url}}/trips/{{trip_id}}/driver-accept",
-        "description": "See docs/api-reference.md. Run in collection order."
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test(\"13 Driver accepts\", function () {",
-              "  try {",
-              "pm.expect(pm.response.code).to.eql(200);",
-              "const trip = pm.response.json();",
-              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
-              "pm.expect(trip.currency).to.eql('VND');",
-              "pm.expect(trip.status).to.eql('DriverAccepted');",
-              "pm.expect(trip.assignedDriverId).to.eql(pm.variables.get('offered_driver_id'));",
-              "  } catch (error) {",
-              "    pm.execution.setNextRequest(null);",
-              "    throw error;",
-              "  }",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "14 En route",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{driver_token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": "{{base_url}}/trips/{{trip_id}}/en-route",
-        "description": "See docs/api-reference.md. Run in collection order."
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test(\"14 En route\", function () {",
-              "  try {",
-              "pm.expect(pm.response.code).to.eql(200);",
-              "const trip = pm.response.json();",
-              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
-              "pm.expect(trip.currency).to.eql('VND');",
-              "pm.expect(trip.status).to.eql('EnRoute');",
-              "pm.expect(trip.assignedDriverId).to.eql(pm.variables.get('offered_driver_id'));",
-              "  } catch (error) {",
-              "    pm.execution.setNextRequest(null);",
-              "    throw error;",
-              "  }",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "15 Pickup",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{driver_token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": "{{base_url}}/trips/{{trip_id}}/pickup",
-        "description": "See docs/api-reference.md. Run in collection order."
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test(\"15 Pickup\", function () {",
-              "  try {",
-              "pm.expect(pm.response.code).to.eql(200);",
-              "const trip = pm.response.json();",
-              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
-              "pm.expect(trip.currency).to.eql('VND');",
-              "pm.expect(trip.status).to.eql('PickedUp');",
-              "pm.expect(trip.assignedDriverId).to.eql(pm.variables.get('offered_driver_id'));",
-              "  } catch (error) {",
-              "    pm.execution.setNextRequest(null);",
-              "    throw error;",
-              "  }",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "16 Dropoff",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Idempotency-Key",
-            "value": "{{dropoff_key}}"
-          }
-        ],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{driver_token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": "{{base_url}}/trips/{{trip_id}}/dropoff",
-        "description": "See docs/api-reference.md. Run in collection order."
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test(\"16 Dropoff\", function () {",
-              "  try {",
-              "pm.expect(pm.response.code).to.eql(200);",
-              "const trip = pm.response.json();",
-              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
-              "pm.expect(trip.currency).to.eql('VND');",
-              "pm.expect(trip.status).to.be.oneOf(['PaymentPending', 'Paid']);",
-              "  } catch (error) {",
-              "    pm.execution.setNextRequest(null);",
-              "    throw error;",
-              "  }",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "17 Replay dropoff",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Idempotency-Key",
-            "value": "{{dropoff_key}}"
-          }
-        ],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{driver_token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": "{{base_url}}/trips/{{trip_id}}/dropoff",
-        "description": "See docs/api-reference.md. Run in collection order."
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test(\"17 Replay dropoff\", function () {",
-              "  try {",
-              "pm.expect(pm.response.code).to.eql(200);",
-              "const trip = pm.response.json();",
-              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
-              "pm.expect(trip.currency).to.eql('VND');",
-              "pm.expect(trip.status).to.be.oneOf(['PaymentPending', 'Paid']);",
-              "  } catch (error) {",
-              "    pm.execution.setNextRequest(null);",
-              "    throw error;",
-              "  }",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "18 Wait for Paid",
+      "name": "12 Wait for driver offer",
       "request": {
         "method": "GET",
         "header": [],
@@ -811,7 +555,7 @@
           ]
         },
         "url": "{{base_url}}/trips/{{trip_id}}",
-        "description": "See docs/api-reference.md. Run in collection order."
+        "description": "Waits for the Matching reply to assign an offered driver. Stops on Failed, invalid data or the polling limit."
       },
       "event": [
         {
@@ -819,16 +563,324 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"18 Wait for Paid\", function () {",
+              "pm.test(\"12 Wait for driver offer\", function () {",
               "  try {",
               "pm.expect(pm.response.code).to.eql(200);",
               "const trip = pm.response.json();",
-              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+              "pm.expect(trip.id).to.eql(pm.environment.get('trip_id'));",
+              "pm.expect(trip.quoteId).to.eql(pm.environment.get('quote_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.environment.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.eql('DriverOffered');",
+              "if (trip.offeredDriverId === null) {",
+              "  const count = Number(pm.variables.get('driver_polls') || 0) + 1;",
+              "  pm.variables.set('driver_polls', count);",
+              "  pm.expect(count, 'Driver offer polling limit exceeded; inspect Matching consumers, outbox and error queues').to.be.below(30);",
+              "  pm.execution.setNextRequest(pm.info.requestName);",
+              "} else {",
+              "  pm.expect(trip.offeredDriverId).to.be.a('string').and.not.empty;",
+              "  pm.environment.set('offered_driver_id', trip.offeredDriverId);",
+              "}",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Offered driver token",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{base_url}}/dev/token?userId={{offered_driver_id}}&role=driver",
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"13 Offered driver token\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const token = pm.response.json().access_token;",
+              "pm.expect(token).to.be.a('string').and.not.empty;",
+              "pm.environment.set('driver_token', token);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 Driver accepts",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{driver_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}/driver-accept",
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"14 Driver accepts\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.environment.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.environment.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.eql('DriverAccepted');",
+              "pm.expect(trip.assignedDriverId).to.eql(pm.environment.get('offered_driver_id'));",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 En route",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{driver_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}/en-route",
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"15 En route\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.environment.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.environment.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.eql('EnRoute');",
+              "pm.expect(trip.assignedDriverId).to.eql(pm.environment.get('offered_driver_id'));",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 Pickup",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{driver_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}/pickup",
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"16 Pickup\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.environment.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.environment.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.eql('PickedUp');",
+              "pm.expect(trip.assignedDriverId).to.eql(pm.environment.get('offered_driver_id'));",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 Dropoff",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "{{dropoff_key}}"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{driver_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}/dropoff",
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"17 Dropoff\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.environment.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.environment.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.be.oneOf(['PaymentPending', 'Paid']);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 Replay dropoff",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "{{dropoff_key}}"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{driver_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}/dropoff",
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"18 Replay dropoff\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.environment.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.environment.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.be.oneOf(['PaymentPending', 'Paid']);",
+              "  } catch (error) {",
+              "    pm.execution.setNextRequest(null);",
+              "    throw error;",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 Wait for Paid",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{rider_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}",
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"19 Wait for Paid\", function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.environment.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.environment.get('fare_amount'));",
               "pm.expect(trip.currency).to.eql('VND');",
               "pm.expect(trip.status).to.be.oneOf(['PaymentPending', 'Paid']);",
               "if (trip.status !== 'Paid') {",
-              "  const count = Number(pm.variables.get('paid_polls')) + 1;",
+              "  const count = Number(pm.variables.get('paid_polls') || 0) + 1;",
               "  pm.variables.set('paid_polls', count);",
               "  pm.expect(count, 'Payment polling limit exceeded').to.be.below(30);",
               "  pm.execution.setNextRequest(pm.info.requestName);",
@@ -846,7 +898,7 @@
       ]
     },
     {
-      "name": "19 Demo driver offline",
+      "name": "20 Demo driver offline",
       "request": {
         "method": "PUT",
         "header": [
@@ -866,7 +918,7 @@
           ]
         },
         "url": "{{base_url}}/drivers/{{driver_id}}/location",
-        "description": "See docs/api-reference.md. Run in collection order.",
+        "description": "See docs/api-reference.md section 7. Select a Postman environment. Send independently with saved tokens and trip data, or use Collection Runner for the full workflow.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"latitude\": 10.7725,\n  \"longitude\": 106.698,\n  \"isOnline\": false\n}",
@@ -883,7 +935,7 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"19 Demo driver offline\", function () {",
+              "pm.test(\"20 Demo driver offline\", function () {",
               "  try {",
               "pm.expect(pm.response.code).to.eql(204);",
               "  } catch (error) {",
@@ -895,6 +947,24 @@
           }
         }
       ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.environment.id) {",
+          "  throw new Error('Select a Postman environment before sending requests.');",
+          "}",
+          "for (const [key, prefix] of [['rider_id', 'pm-rider-'], ['driver_id', 'pm-driver-'], ['create_key', 'create-'], ['dropoff_key', 'dropoff-']]) {",
+          "  if (!pm.environment.get(key)) {",
+          "    pm.environment.set(key, prefix + pm.variables.replaceIn('{{$guid}}'));",
+          "  }",
+          "}"
+        ]
+      }
     }
   ]
 }

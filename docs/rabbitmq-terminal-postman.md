@@ -32,6 +32,7 @@ Mở `.env` bằng editor, cập nhật các dòng tương ứng, không tạo n
 ```dotenv
 ASPNETCORE_ENVIRONMENT=Development
 MESSAGING_TRANSPORT=RabbitMQ
+TRIP_LIFECYCLE_MATCHING_TRANSPORT=Events
 RABBITMQ_HOST=rabbitmq
 RABBITMQ_USER=swiftride
 RABBITMQ_PASSWORD=<mat-khau-local-cua-ban>
@@ -82,6 +83,12 @@ Các queue chính được khai báo trong `infra/rabbitmq/definitions.json`:
 
 | Queue | Vai trò |
 |---|---|
+| `matching-quote-requested` | Matching nhận yêu cầu báo giá và tìm tài xế ứng viên |
+| `trip-quote-ready` | Trip nhận báo giá thành công |
+| `trip-quote-failed` | Trip nhận kết quả báo giá thất bại |
+| `matching-driver-match-requested` | Matching nhận yêu cầu tìm tài xế sau xác nhận/từ chối |
+| `trip-driver-matched` | Trip nhận tài xế được tìm thấy và giữ chỗ |
+| `trip-driver-match-failed` | Trip nhận kết quả không tìm được tài xế |
 | `payment-ride-completed` | Payment nhận sự kiện hoàn tất chuyến để thu tiền |
 | `trip-payment-settled` | Trip nhận kết quả thanh toán thành công |
 | `trip-payment-failed` | Trip nhận kết quả thanh toán thất bại |
@@ -232,26 +239,31 @@ Có thể thấy binding từ default exchange với `source` rỗng; đó là h
 
 ### Bước 12: Tạo bản collection demo Events
 
-1. Import [SwiftRide Gateway Smoke](../postman/SwiftRide.Gateway.Smoke.postman_collection.json) nếu chưa có.
-2. Duplicate trong Postman, đặt tên **SwiftRide Events Demo**. Giữ file gốc trong repo dùng REST.
-3. Trong bản duplicate, đổi `"paymentTransport": "Rest"` thành `"paymentTransport": "Events"` ở body của **07 Create trip**, **09 Replay create**, **10 Changed payload conflicts**.
-4. Giữ nguyên các trường khác, headers và scripts. Request 10 vẫn đổi payment method để kiểm tra xung đột; không sửa nó thành payload giống request 07.
-5. Kiểm tra collection variable `base_url = http://localhost:5080`.
+1. Import lại [SwiftRide Gateway — Matching Events + Payment Events](../postman/SwiftRide.Gateway.Smoke.postman_collection.json), dùng bản mới có 20 request thay cho bản REST cũ.
+2. Đặt `TRIP_LIFECYCLE_MATCHING_TRANSPORT=Events` cùng `MESSAGING_TRANSPORT=RabbitMQ`, `RABBITMQ_HOST=rabbitmq` trong `.env`; recreate ba service bằng `docker compose --profile messaging up --build -d`. Kiểm tra cả Trip, Matching và Payment đã nối RabbitMQ.
+3. Collection đã gửi `"paymentTransport": "Events"` ở **07 Create trip**, **09 Replay create**, **10 Changed payload conflicts**; không cần sửa body thủ công.
+4. Giữ nguyên headers và scripts. Request 10 vẫn đổi payment method để kiểm tra xung đột; không sửa nó thành payload giống request 07. Bước **12 Wait for driver offer** chờ reply Matching trước khi lấy token tài xế.
+5. Chọn Environment riêng (ví dụ `SwiftRide Local`), kiểm tra `base_url = http://localhost:5080`. Collection lưu token và dữ liệu chuyến vào environment để dùng lại khi Send riêng; xem [hướng dẫn chạy độc lập](api-reference.md#7-kiểm-thử-nhanh-bằng-postman). Dùng environment mới cho một lượt chạy toàn bộ mới.
 
 **Bật broker không tự đổi chuyến sang Events.** Compose hiện không ánh xạ `TRIP_LIFECYCLE__PAYMENT_TRANSPORT` trong `.env` vào Trip; cách rõ ràng nhất cho demo là gửi trường `paymentTransport` như trên. Chuyến đã tạo lưu snapshot transport, nên hãy tạo chuyến mới bằng bản Events, không tiếp tục chuyến REST cũ.
 
 ### Bước 13: Ghi nhận trước và sau khi chạy
 
 1. Mở terminal theo dõi queue ở bước 6.
-2. Trong collection quản trị, Send **Inspect Queue** cho `payment-ride-completed`, rồi `trip-payment-settled`; ghi nhận các counter trước khi chạy.
-3. Trong **SwiftRide Events Demo**, chọn **Run collection**, chọn đủ 19 request theo thứ tự, **1 iteration**, delay **1000 ms**, timeout **15000 ms**.
-4. Đợi đến **18 Wait for Paid** thành công. Hai bước polling có giới hạn, không coi timeout là thành công.
-5. Đợi vài giây cho thống kê broker cập nhật. Send lại **Inspect Queue** cho hai queue; so sánh các counter trước/sau nếu chúng có sẵn. Nếu cần, đổi `queue_name` về đúng queue trước mỗi lần Send.
+2. Trong collection quản trị, Send **Inspect Queue** lần lượt cho `matching-quote-requested`, `trip-quote-ready`, `matching-driver-match-requested`, `trip-driver-matched`, `payment-ride-completed`, `trip-payment-settled`; ghi nhận các counter trước khi chạy.
+3. Trong **SwiftRide Gateway - Matching Events + Payment Events**, chọn **Run collection**, chọn đủ 20 request theo thứ tự, **1 iteration**, delay **1000 ms**, timeout **15000 ms**.
+4. Đợi đến **19 Wait for Paid** thành công. Ba bước polling quote/driver/payment đều có giới hạn 30 response đang chờ, không coi timeout là thành công. Retry broker có thể dài hơn thời gian demo này; kiểm tra lỗi và tiến độ nếu hết lượt.
+5. Đợi vài giây cho thống kê broker cập nhật. Send lại **Inspect Queue** cho sáu queue; so sánh các counter trước/sau nếu chúng có sẵn. Đổi `queue_name` về đúng queue trước mỗi lần Send.
 6. Trong terminal kiểm tra các queue `_error`; nếu có message mới, xem [hướng dẫn xử lý lỗi](messaging-operations.md).
 
 Luồng mong đợi:
 
 ```text
+POST /trips qua Gateway → Trip Outbox: QuoteRequestedV1
+  → matching-quote-requested → Matching → QuoteReadyV1 → trip-quote-ready → Quoted
+POST /trips/{id}/confirm-quote → Trip Outbox: DriverMatchRequestedV1
+  → matching-driver-match-requested → Matching → DriverMatchedV1 → trip-driver-matched
+  → DriverOffered có offeredDriverId → accept → en-route → pickup
 POST /trips/{id}/dropoff qua Gateway
   → Trip ghi Outbox
   → exchange SwiftRide.Contracts.V1:RideCompletedV1
@@ -275,7 +287,7 @@ Phần tùy chọn, chỉ trong môi trường demo riêng. Không làm khi ngư
 docker compose --profile messaging stop payment-service
 ```
 
-3. Trong Postman Runner của **SwiftRide Events Demo**, chọn request **01 đến 17**, bỏ chọn 18 và 19, chạy 1 iteration. Runner chuẩn bị driver, tạo chuyến và thực hiện dropoff; không chờ Paid lúc Payment đã dừng.
+3. Trong Postman Runner của **SwiftRide Gateway - Matching Events + Payment Events**, chọn request **01 đến 18**, bỏ chọn 19 và 20, chạy 1 iteration. Runner chuẩn bị driver, tạo chuyến và thực hiện dropoff; không chờ Paid lúc Payment đã dừng. Matching vẫn phải hoạt động.
 4. Đọc **Inspect Queue** với `queue_name = payment-ride-completed`, hoặc chạy lệnh bước 4. Khi Outbox publish xong, mong đợi `messages_ready` tăng, `consumers = 0` nếu không có Payment instance khác. Chờ vài giây rồi đọc lại nếu publisher chưa gửi xong. Có thể có nhiều message nếu các chuyến khác cũng đang chờ.
 5. Khởi động lại Payment ngay sau khi quan sát, kể cả nếu demo gặp lỗi:
 
@@ -284,7 +296,7 @@ docker compose --profile messaging start payment-service
 ```
 
 6. Chờ consumer kết nối, Send **Inspect Queue** lại: consumer xuất hiện, ready giảm khi message được xử lý. `unacknowledged` có thể tăng rất ngắn nên không chắc thấy được bằng polling.
-7. Dùng token rider và trip ID của lượt demo để gọi `GET /trips/{id}` qua Gateway, kiểm tra `Paid`. Token/ID của collection gốc là run-local, không lưu sau Runner; có thể lấy chúng từ request/response của kết quả Runner. Không chia sẻ ảnh chứa token. Không bấm Send request 18 bên ngoài Runner rồi kỳ vọng nó tự có biến từ lượt chạy trước.
+7. Giữ đúng environment của lượt demo, Send **19 Wait for Paid** để gọi `GET /trips/{id}` qua Gateway và kiểm tra `Paid`. Token/ID đã được lưu trong environment; nếu Runner có tùy chọn **Keep variable values**, bật trước khi chạy. Khi Send riêng, request không tự polling; gửi lại sau khoảng nghỉ nếu còn `PaymentPending`. Không chia sẻ/export environment hoặc ảnh chứa token.
 8. Nếu cần, gửi PUT offline driver demo bằng đúng token driver, hoặc chờ vị trí hết hạn. Không xóa dữ liệu để dọn demo.
 
 Không cần dùng `POST /api/queues/.../get` để xem metrics: thao tác đó thực sự lấy message và thay đổi trạng thái queue, kể cả khi chọn requeue. Hướng dẫn này chỉ dùng các API quản trị GET để quan sát.
