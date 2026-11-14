@@ -13,7 +13,8 @@ public sealed record CreateTripCommand(
     string? DestinationAddress,
     string PaymentMethod,
     string Mode = "standard",
-    string? PaymentTransport = null);
+    string? PaymentTransport = null,
+    string? DemoPaymentOutcome = null);
 
 public abstract record TripCommand(string ActionName);
 

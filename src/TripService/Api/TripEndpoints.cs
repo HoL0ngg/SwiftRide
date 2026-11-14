@@ -71,8 +71,15 @@ public static class TripEndpoints
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         ClaimsPrincipal user,
         CreateTripUseCase useCase,
+        IWebHostEnvironment environment,
         CancellationToken ct)
     {
+        if (request.DemoPaymentOutcome is not null && !environment.IsDevelopment())
+        {
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest,
+                title: "Demo payment outcomes are only available in Development.");
+        }
+
         if (string.IsNullOrWhiteSpace(idempotencyKey))
         {
             return Results.Problem(
@@ -101,7 +108,8 @@ public static class TripEndpoints
             request.DestinationAddress,
             request.PaymentMethod ?? "card",
             request.Mode ?? "standard",
-            request.PaymentTransport);
+            request.PaymentTransport,
+            request.DemoPaymentOutcome);
 
         var result = await useCase.ExecuteAsync(command, ct);
         TripTelemetry.TripsCreated.Add(1);

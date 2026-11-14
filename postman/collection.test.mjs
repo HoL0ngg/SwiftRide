@@ -6,6 +6,7 @@ import { expect } from '../src/WebApp/node_modules/chai/index.js';
 
 // shortcut: simulate the pm surface used here; use Postman Runner to verify real HTTP behavior.
 const collection = JSON.parse(readFileSync(new URL('./SwiftRide.Gateway.Smoke.postman_collection.json', import.meta.url)));
+const items = collection.item.filter(item => item.name !== '11b Wait for driver');
 const trip = {
   id: '11111111-1111-4111-8111-111111111111',
   quoteId: '22222222-2222-4222-8222-222222222222',
@@ -14,7 +15,7 @@ const trip = {
 };
 
 function execute(index, code, body, values = new Map(), listen = 'test') {
-  const item = collection.item[index];
+  const item = typeof index === 'number' ? items[index] : index;
   const failures = [];
   let next;
   const pm = {
@@ -36,7 +37,7 @@ function execute(index, code, body, values = new Map(), listen = 'test') {
 }
 
 test('all scripts parse and requests stay on Gateway without committed credentials', () => {
-  assert.equal(collection.item.length, 19);
+  assert.equal(collection.item.length, 20);
   for (const item of collection.item) {
     assert.match(item.request.url, /^\{\{base_url\}\}\/(health|dev\/token|trips|drivers)([/?]|$)/);
     assert.ok(!item.request.header.some(header => header.key === 'X-Internal-Api-Key'));
@@ -44,9 +45,9 @@ test('all scripts parse and requests stay on Gateway without committed credentia
     if (item.request.body) JSON.parse(item.request.body.raw);
   }
   assert.deepEqual(collection.variable.map(variable => variable.key), ['base_url']);
-  assert.equal(collection.item[6].request.body.raw, collection.item[8].request.body.raw);
-  assert.equal(collection.item[6].request.header.at(-1).value, collection.item[8].request.header.at(-1).value);
-  assert.equal(collection.item[15].request.header.at(-1).value, collection.item[16].request.header.at(-1).value);
+  assert.equal(items[6].request.body.raw, items[8].request.body.raw);
+  assert.equal(items[6].request.header.at(-1).value, items[8].request.header.at(-1).value);
+  assert.equal(items[15].request.header.at(-1).value, items[16].request.header.at(-1).value);
 });
 
 test('complete successful response sequence chains tokens, IDs and exact fare', () => {
@@ -62,8 +63,13 @@ test('complete successful response sequence chains tokens, IDs and exact fare', 
   ];
   responses.forEach(([code, body], index) => {
     const result = execute(index, code, body, values);
-    assert.deepEqual(result.failures, [], collection.item[index].name);
+    assert.deepEqual(result.failures, [], items[index].name);
     assert.equal(result.next, undefined);
+    if (index === 10) {
+      const ready = execute(collection.item.find(item => item.name === '11b Wait for driver'), 200,
+        { ...trip, status: 'DriverOffered' }, values);
+      assert.deepEqual(ready.failures, []);
+    }
   });
   assert.equal(values.get('trip_id'), trip.id);
   assert.equal(values.get('quote_id'), trip.quoteId);
@@ -79,7 +85,7 @@ test('both polling steps repeat transient states then stop at the hard limit', (
       const result = execute(index, 200, { ...trip, status }, values);
       assert.equal(values.get(counter), attempt);
       assert.equal(result.failures.length, attempt < 30 ? 0 : 1);
-      assert.equal(result.next, attempt < 30 ? collection.item[index].name : null);
+      assert.equal(result.next, attempt < 30 ? items[index].name : null);
     }
   }
 });

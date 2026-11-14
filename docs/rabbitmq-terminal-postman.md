@@ -1,5 +1,7 @@
 # Xem thông tin RabbitMQ trên terminal và Postman Console
 
+> Bộ demo nhiều kịch bản, gồm Matching Events, thanh toán lỗi và queue quan sát bản sao: xem [postman-demo.md](postman-demo.md). Hướng dẫn này giữ các lệnh kiểm tra terminal; collection Smoke vẫn dùng thanh toán REST.
+
 Hướng dẫn cho SwiftRide trên Windows/PowerShell, đối chiếu cấu hình ngày 12/11/2026. Mục tiêu: khi chạy chuyến đi qua Gateway, xem được exchange, queue, binding, consumer và số lượng message chờ/đã giao.
 
 RabbitMQ trong dự án không có partition/offset như Kafka. Không gọi queue là partition hoặc dùng delivery tag thay cho Kafka offset. Đây là thông tin quan sát tương ứng với kiến trúc RabbitMQ, không phải thay thế nguyên nghĩa một yêu cầu bắt buộc dùng Kafka.

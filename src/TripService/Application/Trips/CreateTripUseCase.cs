@@ -61,8 +61,8 @@ public sealed class CreateTripUseCase(
         var tripId = Guid.CreateVersion7();
         var trip = Trip.Request(tripId, cmd.Actor.Id, _lifecycleOptions.MaxDriverRejections);
 
-        var normalizedMethod = cmd.PaymentMethod.ToLowerInvariant();
-        var mockAlias = normalizedMethod == "card" ? "card.success.v1" : "wallet.success.v1";
+        var normalizedMethod = cmd.PaymentMethod.Trim().ToLowerInvariant();
+        var mockAlias = $"{normalizedMethod}.{cmd.DemoPaymentOutcome ?? "success"}.v1";
 
         var effectiveTransport = !string.IsNullOrWhiteSpace(cmd.PaymentTransport)
             ? cmd.PaymentTransport.Trim()
@@ -158,6 +158,10 @@ public sealed class CreateTripUseCase(
             sb.Append(p.Length).Append(':').Append(p).Append(';');
         }
 
+        // Preserve fingerprints for existing successful requests and distinguish simulated failures.
+        if (cmd.DemoPaymentOutcome is "declined" or "timeout")
+            sb.Append("demo:").Append(cmd.DemoPaymentOutcome).Append(';');
+
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString())));
     }
 
@@ -185,6 +189,9 @@ public sealed class CreateTripUseCase(
         {
             throw new InvalidTripCommandException("Payment method must be 'card' or 'wallet'.");
         }
+
+        if (cmd.DemoPaymentOutcome is not (null or "success" or "declined" or "timeout"))
+            throw new InvalidTripCommandException("Demo payment outcome must be 'success', 'declined' or 'timeout'.");
 
         var mode = cmd.Mode?.Trim() ?? "standard";
         if (!_lifecycleOptions.SupportedPricingModes.Contains(mode, StringComparer.OrdinalIgnoreCase))

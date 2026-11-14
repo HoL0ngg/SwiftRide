@@ -26,9 +26,9 @@ public class TripEndpointTests
     private const string Issuer = "swiftride-tests";
     private const string Audience = "swiftride-tests";
 
-    private async Task<(WebApplication App, HttpClient Client, MockServices Mocks)> CreateHostAsync()
+    private async Task<(WebApplication App, HttpClient Client, MockServices Mocks)> CreateHostAsync(string environment = "Development")
     {
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -179,6 +179,42 @@ public class TripEndpointTests
 
             var res = await client.GetAsync("/trips/current");
             Assert.Equal(HttpStatusCode.NoContent, res.StatusCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("Development", "declined", 201, "wallet.declined.v1")]
+    [InlineData("Development", "timeout", 201, "wallet.timeout.v1")]
+    [InlineData("Development", "success", 201, "wallet.success.v1")]
+    [InlineData("Development", "arbitrary-token", 400, null)]
+    [InlineData("Staging", "declined", 400, null)]
+    public async Task CreateTrip_DemoPaymentOutcome_IsValidatedAndRestrictedToDevelopment(
+        string environment, string outcome, int expectedStatus, string? expectedAlias)
+    {
+        var (app, client, mocks) = await CreateHostAsync(environment);
+        await using (app)
+        using (client)
+        {
+            Authenticate(client, "rider-demo", "rider");
+            client.DefaultRequestHeaders.Add("Idempotency-Key", "demo-create");
+            TripContext? saved = null;
+            mocks.Writer.Setup(w => w.Add(It.IsAny<TripContext>())).Callback<TripContext>(ctx => saved = ctx);
+            mocks.MatchingClient.Setup(m => m.MatchAsync(It.IsAny<MatchInput>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new MatchOutcome(MatchStatus.Matched, new CandidateDriver("drv-1", 1)));
+            mocks.MatchingClient.Setup(m => m.QuoteAsync(It.IsAny<QuoteInput>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new QuotedFare(Guid.NewGuid(), 50_000m, "VND", 5m, 15m, DateTimeOffset.UtcNow));
+
+            var res = await client.PostAsJsonAsync("/trips", new
+            {
+                pickup = new { latitude = 10.76, longitude = 106.66 },
+                destination = new { latitude = 10.78, longitude = 106.72 },
+                paymentMethod = "wallet", demoPaymentOutcome = outcome
+            });
+            Assert.Equal(expectedStatus, (int)res.StatusCode);
+            if (expectedAlias is null)
+                mocks.Writer.Verify(w => w.Add(It.IsAny<TripContext>()), Times.Never);
+            else
+                Assert.Equal(expectedAlias, saved!.MockTokenAlias);
         }
     }
 

@@ -1,0 +1,904 @@
+{
+  "info": {
+    "name": "SwiftRide RabbitMQ Observe",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Operator-only Management API, separate from client traffic. Run Setup BEFORE Gateway demo; then Read manually or inspect UI. Do not run Cleanup before inspecting. Receives copies without consuming business queues. Credentials belong in a local environment; do not export them. Queue/messages expire after one hour."
+  },
+  "variable": [
+    {
+      "key": "rabbitmq_url",
+      "value": "http://localhost:15672"
+    },
+    {
+      "key": "observer_queue",
+      "value": "demo-observe-postman"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Setup - run before demo",
+      "item": [
+        {
+          "name": "01 Create observation queue",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/queues/%2F/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"durable\": false,\n  \"auto_delete\": false,\n  \"arguments\": {\n    \"x-expires\": 3600000,\n    \"x-message-ttl\": 3600000\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('rabbitmq_user') || !pm.variables.get('rabbitmq_password')) throw new Error('Set rabbitmq_user and rabbitmq_password in a local Postman environment.');",
+                  "if (!/^demo-observe-[a-zA-Z0-9-]+$/.test(pm.variables.get('observer_queue') || '')) throw new Error('observer_queue must start with demo-observe- and contain only letters, digits and hyphens.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Bind TripAcceptedV1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3ATripAcceptedV1/q/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Bind RideCompletedV1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3ARideCompletedV1/q/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Bind PaymentSettledV1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3APaymentSettledV1/q/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Bind PaymentFailedV1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3APaymentFailedV1/q/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Bind PaymentCompensationRequestedV1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3APaymentCompensationRequestedV1/q/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Bind PaymentRefundedV1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3APaymentRefundedV1/q/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Bind PaymentCompensationFailedV1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3APaymentCompensationFailedV1/q/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 Bind QuoteRequestedV1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3AQuoteRequestedV1/q/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 Bind QuoteReadyV1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3AQuoteReadyV1/q/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 Bind QuoteFailedV1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3AQuoteFailedV1/q/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 Bind DriverMatchRequestedV1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3ADriverMatchRequestedV1/q/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 Bind DriverMatchedV1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3ADriverMatchedV1/q/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 Bind DriverMatchFailedV1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3ADriverMatchFailedV1/q/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Read - run after demo",
+      "item": [
+        {
+          "name": "15 Read captured messages (requeue)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/queues/%2F/{{observer_queue}}/get",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 100,\n  \"ackmode\": \"ack_requeue_true\",\n  \"encoding\": \"auto\",\n  \"truncate\": 100000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^demo-observe-[a-zA-Z0-9-]+$/.test(pm.variables.get('observer_queue') || '')) throw new Error('Only demo-observe-* queues are allowed.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.eql(200);",
+                  "const messages = pm.response.json();",
+                  "pm.expect(messages).to.be.an('array');",
+                  "messages.forEach(entry => {",
+                  "  let payload;",
+                  "  try { payload = JSON.parse(entry.payload); } catch (_) { return; }",
+                  "  const message = payload.message || {};",
+                  "  console.log(entry.exchange, { tripId: message.tripId, eventId: message.eventId, failureCode: message.failureCode });",
+                  "});",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Cleanup - run after inspection",
+      "item": [
+        {
+          "name": "16 Delete observation queue only",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_password}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbitmq_url}}/api/queues/%2F/{{observer_queue}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^demo-observe-[a-zA-Z0-9-]+$/.test(pm.variables.get('observer_queue') || '')) throw new Error('Only demo-observe-* queues are allowed.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

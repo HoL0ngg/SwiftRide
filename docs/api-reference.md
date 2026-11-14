@@ -76,8 +76,9 @@ Idempotency-Key: <unique-create-key>
 | `paymentMethod` | string | `card` hoặc `wallet`; thiếu/null được endpoint mặc định `card`; nên gửi rõ giá trị |
 | `mode` | string | Tùy chọn, mặc định `standard`; phải nằm trong các mode server hỗ trợ |
 | `paymentTransport` | string / null | Tùy chọn kỹ thuật cho demo: `Rest` hoặc `Events`; thường bỏ để dùng cấu hình server. Gửi `Events` khi messaging tắt trả `400` |
+| `demoPaymentOutcome` | string / null | Chỉ Development: `success`, `declined`, `timeout`; bỏ trường này dùng mock thành công. Ngoài Development trả `400` nếu gửi trường này. Xem [demo Postman](postman-demo.md) |
 
-Rider lấy từ JWT, không gửi `riderId`, giá, payment token hay thông tin thẻ. Trip tự chọn mock token tương ứng phương thức. Một rider chỉ có một chuyến đang hoạt động, nếu tạo thêm trả `409`.
+Rider lấy từ JWT, không gửi `riderId`, giá, payment token hay thông tin thẻ. Trip tự chọn mock token tương ứng phương thức và kết quả demo được phép. Một rider chỉ có một chuyến đang hoạt động, nếu tạo thêm trả `409`.
 
 Giới hạn validation hiện tại: DTO tọa độ của Trip dùng `double` không nullable; nếu bỏ một thành phần tọa độ, bộ bind có thể cho giá trị mặc định `0`. Luôn gửi đủ latitude/longitude. Matching dùng trường nullable và kiểm tra thiếu tọa độ rõ ràng. Thay đổi nhỏ đề xuất cho lần sửa validation: kiểm tra sự hiện diện từng thành phần ở biên HTTP của Trip và thêm test; tài liệu này không sửa hành vi API.
 
@@ -122,6 +123,7 @@ Luồng chính: `Requested → Quoted → DriverOffered → DriverAccepted → E
 
 - `POST /trips` bắt buộc `Idempotency-Key`. Cùng actor, cùng key và nội dung nghiệp vụ tương đương trả lại cùng chuyến; thay đổi nội dung được fingerprint kiểm tra trả `409`.
 - Fingerprint tạo chuyến hiện dùng actor, tọa độ làm tròn 6 số thập phân, payment method và mode; **không gồm tên/địa chỉ và paymentTransport**. Không dùng replay để cập nhật các trường này. Response replay phản ánh trạng thái hiện tại, không bảo đảm JSON giống hệt lần đầu.
+- `demoPaymentOutcome=declined/timeout` được phân biệt trong fingerprint; bỏ trường hoặc `success` giữ fingerprint thành công như trước.
 - Các lệnh còn lại nhận header này tùy chọn; nếu bỏ, server sinh key cố định theo action và trip. Gửi key riêng cho mỗi thao tác mới, giữ nguyên khi retry. Với driver-reject, tài xế mới phải dùng danh tính của mình sau rematch.
 - Confirm phải dùng đúng `quoteId` đang gắn với chuyến. Giá được giữ nguyên khi rider xác nhận và khi rematch. Vượt giới hạn từ chối `k` (mặc định 3), hoặc không còn tài xế phù hợp, chuyến có thể `Failed`.
 

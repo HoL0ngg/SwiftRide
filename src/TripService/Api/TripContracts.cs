@@ -11,7 +11,8 @@ public sealed record CreateTripRequest(
     string? DestinationAddress,
     string PaymentMethod,
     string? Mode = "standard",
-    string? PaymentTransport = null);
+    string? PaymentTransport = null,
+    string? DemoPaymentOutcome = null);
 
 public sealed record ConfirmQuoteRequest(Guid QuoteId);
 

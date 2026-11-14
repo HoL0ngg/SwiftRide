@@ -13,6 +13,19 @@ namespace SwiftRide.TripService.Tests.Application;
 
 public class CreateTripTests
 {
+    [Fact]
+    public void DemoPaymentOutcome_FingerprintPreservesSuccessAndDistinguishesFailures()
+    {
+        var command = ValidCommand();
+        var original = CreateTripUseCase.ComputeRequestHash(command);
+        Assert.Equal(original, CreateTripUseCase.ComputeRequestHash(command with { DemoPaymentOutcome = "success" }));
+        var declined = CreateTripUseCase.ComputeRequestHash(command with { DemoPaymentOutcome = "declined" });
+        var timeout = CreateTripUseCase.ComputeRequestHash(command with { DemoPaymentOutcome = "timeout" });
+        Assert.NotEqual(original, declined);
+        Assert.NotEqual(original, timeout);
+        Assert.NotEqual(declined, timeout);
+    }
+
     private readonly Mock<ITripReader> _reader = new();
     private readonly Mock<ITripWriter> _writer = new();
     private readonly Mock<ITripUnitOfWork> _uow = new();

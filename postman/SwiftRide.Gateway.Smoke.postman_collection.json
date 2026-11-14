@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "SwiftRide Gateway Smoke",
-    "description": "DevelopmentJwt smoke test through YARP only. See docs/api-reference.md. Creates demo records using mock payments. Run all requests in order, one iteration, delay 1000 ms, request timeout 15000 ms. Tokens are run-local.",
+    "description": "DevelopmentJwt smoke test through YARP only. See docs/api-reference.md and docs/postman-demo.md. Run all requests in order, one iteration, delay 1000 ms, request timeout 20000 ms. Tokens are run-local. Waits for asynchronous driver offers; uses REST payment. For Events payment and failure scenarios use SwiftRide Gateway Demo.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -35,7 +35,8 @@
               "pm.variables.set('create_key', 'create-' + runId);",
               "pm.variables.set('dropoff_key', 'dropoff-' + runId);",
               "pm.variables.set('quote_polls', 0);",
-              "pm.variables.set('paid_polls', 0);"
+              "pm.variables.set('paid_polls', 0);",
+              "pm.variables.set('offer_polls', 0);"
             ]
           }
         },
@@ -519,7 +520,7 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"11 Confirm quote\", function () {",
+              "pm.test(pm.info.requestName, function () {",
               "  try {",
               "pm.expect(pm.response.code).to.eql(200);",
               "const trip = pm.response.json();",
@@ -527,12 +528,55 @@
               "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
               "pm.expect(trip.currency).to.eql('VND');",
               "pm.expect(trip.status).to.eql('DriverOffered');",
-              "pm.expect(trip.offeredDriverId).to.be.a('string').and.not.empty;",
-              "pm.variables.set('offered_driver_id', trip.offeredDriverId);",
-              "  } catch (error) {",
-              "    pm.execution.setNextRequest(null);",
-              "    throw error;",
-              "  }",
+              "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11b Wait for driver",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{rider_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": "{{base_url}}/trips/{{trip_id}}",
+        "description": "See docs/api-reference.md. Run in collection order."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(pm.info.requestName, function () {",
+              "  try {",
+              "pm.expect(pm.response.code).to.eql(200);",
+              "const trip = pm.response.json();",
+              "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
+              "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+              "pm.expect(trip.currency).to.eql('VND');",
+              "pm.expect(trip.status).to.eql('DriverOffered');",
+              "if (!trip.offeredDriverId) {",
+              "  const count = Number(pm.variables.get('offer_polls') || 0) + 1;",
+              "  pm.variables.set('offer_polls', count);",
+              "  pm.expect(count, 'Driver polling limit exceeded').to.be.below(30);",
+              "  pm.execution.setNextRequest(pm.info.requestName);",
+              "} else {",
+              "  pm.expect(trip.offeredDriverId).to.be.a('string').and.not.empty;",
+              "  pm.variables.set('offered_driver_id', trip.offeredDriverId);",
+              "}",
+              "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
               "});"
             ]
           }
