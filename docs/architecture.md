@@ -125,7 +125,8 @@ flowchart LR
     Driver["Driver UI"] --> Gateway
     Gateway -->|"/trips/**"| Trip["Trip Service"]
     Gateway -->|"PUT /drivers/{id}/location"| Matching["Matching & Pricing Service"]
-    Trip -->|"REST: /match, /quote"| Matching
+    Trip -->|"REST: /match, /quote\n(MatchingTransport=Rest)"| Matching
+    Trip <-->|"RabbitMQ: QuoteRequested/DriverMatchRequested\nQuoteReady/DriverMatched/*Failed\n(MatchingTransport=Events)"| Matching
     Trip -->|"REST: /payments\nqua IPaymentClient"| Payment["Payment Service"]
     Trip --> TripDB[("SQL Server: TripDB")]
     Matching --> MatchDB[("Supabase PostgreSQL: matchdb")]
@@ -148,7 +149,7 @@ Mũi tên service -> DB thể hiện quyền truy cập độc quyền. Service 
 ### 4.3. Quy tắc giao tiếp
 
 - Client gọi backend qua Gateway. Các service dùng địa chỉ nội bộ Compose, không vòng lại Gateway.
-- Trip cần phản hồi tức thời từ Matching nên dùng REST. MVP gọi Payment đồng bộ qua abstraction nhưng lưu `PaymentPending` trước khi gọi mạng.
+- Trip ↔ Matching có hai transport, chọn bằng `TripLifecycle:MatchingTransport`. `Rest` (mặc định, luồng MVP): Trip cần phản hồi tức thời nên gọi `/match`, `/quote` đồng bộ. `Events`: Trip → Matching bằng `QuoteRequestedV1`/`DriverMatchRequestedV1` và Matching → Trip bằng `QuoteReadyV1`/`DriverMatchedV1`/`*FailedV1` qua RabbitMQ; `POST /trips` trả `202` với `Requested` và chuyến tiến tiếp khi reply tới (xem [messaging-operations.md](messaging-operations.md#35-luồng-trip--matching-qua-event-matchingtransport--events)). MVP gọi Payment đồng bộ qua abstraction nhưng lưu `PaymentPending` trước khi gọi mạng.
 - HTTP DTO thuộc API hoặc HTTP adapter của từng service. Không reference Domain/Application của service khác.
 - `SwiftRide.Contracts` chỉ chứa integration event dạng plain record có version khi triển khai messaging; không đưa entity, HTTP DTO hay helper nghiệp vụ vào đây.
 - Background work chạy bằng `BackgroundService` trong service sở hữu dữ liệu.
@@ -347,6 +348,8 @@ Candidate lúc `Quoted` chưa được giữ chỗ. Nếu đến lúc xác nhậ
 
 Quyết định contract: `/match` trả candidate hoặc kết quả `NoDriverAvailable`; `/quote` chỉ trả báo giá. Trip phối hợp hai phản hồi và chỉ chuyển `Quoted` khi có đủ. Không gộp việc thay đổi state của Trip vào Matching.
 
+Với `MatchingTransport=Events`, Matching có hai consumer (`QuoteRequestedConsumer` làm cả match lẫn quote trong một message, `DriverMatchRequestedConsumer` chỉ match) dùng lại đúng `MatchDriver`/`CreateQuote` như REST, nên không có logic nghiệp vụ nằm trong consumer. Matching vẫn không đổi state của Trip: nó chỉ trả event, Trip tự quyết định chuyển trạng thái và giữ chỗ tài xế.
+
 ### 8.2. PricingContext và công thức
 
 ```text
@@ -469,6 +472,9 @@ Quy ước idempotency cho command: dùng header `Idempotency-Key`; `RequestId` 
 |---|---|---|
 | `POST /match` | Trip -> Matching | Pickup, excluded driver IDs -> candidate hoặc `NoDriverAvailable` |
 | `POST /quote` | Trip -> Matching | Pickup, destination, pricing mode -> `QuoteId`, amount, currency, estimated distance/time, breakdown |
+
+Hai route `/match`, `/quote` vẫn giữ làm đường REST (`MatchingTransport=Rest`) và đường dự phòng; khi `MatchingTransport=Events`, Trip không gọi chúng.
+
 | `POST /payments` | Trip -> Payment | Trip/rider IDs, fare snapshot, method/token, deterministic key -> payment ID, trip ID, amount, currency, status |
 | `POST /payments/{id}/refund` | Use case nội bộ được phép -> Payment | Full-refund request + deterministic refund key -> refund ID/status |
 
@@ -636,7 +642,7 @@ Envelope có `EventId`, version, `OccurredAtUtc`, `CorrelationId`, causation/tra
 - Payment commit settled + balanced journal + outgoing `PaymentSettledV1` + inbox completion trong local transaction PostgreSQL khi chốt kết quả.
 - Trip consumer kiểm tra event identity và payment identity/fare, cập nhật trạng thái + inbox cùng transaction. Event settled trùng không làm phát sinh transition mới; failed đến trễ không được kéo `Paid` về pending.
 - Publisher có thể crash sau publish trước khi đánh dấu sent; consumer phải chịu được event lặp. Inbox dùng unique consumer + `EventId`, còn payment key ngăn double charge khi cùng logical payment có các event ID khác nhau.
-- Publisher chạy `BackgroundService` trong Trip/Payment. Không thêm Outbox Service và không cần Outbox của Matching nếu chưa có sự kiện cần phát.
+- Publisher chạy `BackgroundService` trong Trip/Payment. Không thêm Outbox Service. Matching có phát event (reply `QuoteReadyV1`, `DriverMatchedV1`, `*FailedV1`) nhưng không có outbox: consumer của Matching idempotent (đọc thuần, `QuoteId` suy ra từ `EventId` của request) và `Publish` là bước cuối, nên nếu publish lỗi thì cả message được retry an toàn. Có thể bổ sung outbox cho Matching sau nếu cần bảo đảm mạnh hơn.
 - MassTransit được pin phiên bản; khi lựa chọn/nâng major phải kiểm tra license và khả năng tương thích trước, không suy ra từ package cũ.
 
 ### 13.4. Retry và error queue

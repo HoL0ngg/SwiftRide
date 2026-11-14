@@ -20,7 +20,9 @@ Trip Service                                   Payment Service
   PaymentSettledConsumer ──► Trip = Paid
 ```
 
-- Chỉ **Trip** và **Payment** dùng RabbitMQ. Gateway và Matching **không** kết nối broker.
+- **Trip**, **Payment** và **Matching** dùng RabbitMQ. Gateway **không** kết nối broker (client chỉ đi qua HTTP/YARP).
+- Matching chỉ có consumer và trả lời trực tiếp bằng `Publish` (không có outbox riêng); hai bên Trip ↔ Matching trao đổi 6 event, xem [messaging-operations.md](messaging-operations.md#35-luồng-trip--matching-qua-event-matchingtransport--events).
+- Để Trip ↔ Matching đi qua RabbitMQ, đặt thêm `TRIP_LIFECYCLE_MATCHING_TRANSPORT=Events` (mặc định `Rest`) và `MESSAGING_TRANSPORT=RabbitMQ` cho **cả** `trip-service` và `matching-service`.
 - Không thêm service thứ 4: outbox publisher là `BackgroundService` chạy trong chính service sở hữu (`TripOutboxPublisher`, `PaymentOutboxPublisher`).
 - Consumer là **at-least-once** và idempotent qua bảng inbox; publish đi qua **Transactional Outbox** nên broker sập không mất event.
 
@@ -34,6 +36,7 @@ Trip Service                                   Payment Service
 | `src/SwiftRide.Contracts/V1/EventTopology.cs` | Hằng số tên exchange & queue |
 | `src/TripService/Infrastructure/Messaging/MessagingRegistration.cs` | Đăng ký MassTransit cho Trip |
 | `src/PaymentService/Infrastructure/Messaging/MessagingRegistration.cs` | Đăng ký MassTransit cho Payment |
+| `src/MatchingService/Infrastructure/Messaging/MessagingRegistration.cs` | Đăng ký MassTransit cho Matching (2 consumer) |
 | `.../Messaging/BoundedMessageRetryPolicy.cs` | Retry có giới hạn, concurrency, prefetch |
 
 ---
@@ -61,7 +64,7 @@ Lưu ý:
 
 - `docker-compose.yml` bắt buộc `RABBITMQ_USER` và `RABBITMQ_PASSWORD` cho container broker (`${RABBITMQ_USER:?...}`); thiếu sẽ báo lỗi khi `docker compose config`.
 - **Không** commit `.env`, **không** dùng `guest/guest` ngoài máy local (AGENTS.md mục 3: không hard-code secrets).
-- Compose ánh xạ biến sang cấu hình .NET như sau (cùng cho `trip-service` và `payment-service`):
+- Compose ánh xạ biến sang cấu hình .NET như sau (cùng cho `trip-service`, `payment-service` và `matching-service`):
 
 | Biến `.env` | Cấu hình .NET | Ghi chú |
 |---|---|---|
@@ -70,6 +73,7 @@ Lưu ý:
 | `RABBITMQ_USER` | `RabbitMQ:Username` | |
 | `RABBITMQ_PASSWORD` | `RabbitMQ:Password` | |
 | *(không map sẵn)* | `RabbitMQ:Port` | Mặc định `5672` |
+| `TRIP_LIFECYCLE_MATCHING_TRANSPORT` | `TripLifecycle:MatchingTransport` | Chỉ `trip-service`. `Rest` (mặc định) hoặc `Events` |
 
 Quy tắc chọn transport trong code (cả hai service giống nhau):
 
@@ -89,7 +93,7 @@ docker compose --profile messaging up --build -d
 docker compose --profile messaging ps
 ```
 
-Healthcheck chỉ đạt sau khi broker phản hồi, xác thực được tài khoản từ environment và đã có đủ 6 binding V1 tới queue sau khi import definitions. Lệnh import trả về trước khi tác vụ hoàn tất, nên không đánh dấu sẵn sàng chỉ dựa vào exit code của lệnh này. Trip/Payment chờ broker healthy khi profile `messaging` được bật; dependency tùy chọn giữ cho luồng REST chạy được khi không bật profile.
+Healthcheck chỉ đạt sau khi broker phản hồi, xác thực được tài khoản từ environment và đã có đủ 12 binding V1 tới queue sau khi import definitions. Lệnh import trả về trước khi tác vụ hoàn tất, nên không đánh dấu sẵn sàng chỉ dựa vào exit code của lệnh này. Trip/Payment/Matching chờ broker healthy khi profile `messaging` được bật; dependency tùy chọn giữ cho luồng REST chạy được khi không bật profile.
 
 Không dùng `load_definitions` lúc boot: [RabbitMQ bỏ qua việc tạo default user khi node trống import definitions](https://www.rabbitmq.com/docs/definitions#import-on-boot-nuances), trong khi file của dự án không chứa credential. Healthcheck import topology một lần sau khi RabbitMQ tạo tài khoản từ environment; marker nằm trong `/tmp` của container.
 
@@ -101,7 +105,7 @@ docker compose --profile messaging exec rabbitmq rabbitmqctl list_queues name me
 docker compose --profile messaging exec rabbitmq rabbitmqctl list_exchanges name type
 ```
 
-Kết quả mong đợi: 6 queue (`payment-ride-completed`, `payment-compensation`, `trip-payment-settled`, `trip-payment-failed`, `trip-payment-refunded`, `trip-payment-compensation-failed`) và các exchange dạng `SwiftRide.Contracts.V1:RideCompletedV1`, đúng tên MassTransit publish.
+Kết quả mong đợi: 12 queue (6 queue thanh toán: `payment-ride-completed`, `payment-compensation`, `trip-payment-settled`, `trip-payment-failed`, `trip-payment-refunded`, `trip-payment-compensation-failed`; 6 queue matching: `matching-quote-requested`, `matching-driver-match-requested`, `trip-quote-ready`, `trip-quote-failed`, `trip-driver-matched`, `trip-driver-match-failed`) và các exchange dạng `SwiftRide.Contracts.V1:RideCompletedV1`, đúng tên MassTransit publish.
 
 ### Mở cổng quản trị / AMQP (chỉ khi cần, chỉ cho máy local)
 
@@ -268,6 +272,6 @@ Các exchange cũ không bị tự động xóa. Khi đổi definitions trên co
 - [ ] `.env` có `MESSAGING_TRANSPORT=RabbitMQ`, `RABBITMQ_HOST=rabbitmq`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` (không commit)
 - [ ] `docker compose config` hợp lệ
 - [ ] `docker compose --profile messaging up --build -d` — `rabbitmq` healthy
-- [ ] 6 queue hiện diện, `_error` queue = 0
+- [ ] 12 queue hiện diện, `_error` queue = 0
 - [ ] Chuyến đi `PaymentTransport=Events` đi tới `Paid`, ledger cân bằng, retry không thu kép
 - [ ] Không mở cổng RabbitMQ ra ngoài máy local; không log token/thẻ

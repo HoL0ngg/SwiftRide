@@ -130,7 +130,9 @@ Internal routes (NOT exposed by the Gateway): `POST /match`, `POST /quote` (call
 
 ## 6. Communication and reliability
 
-- Synchronous (REST by default; gRPC only if the task asks): when an immediate answer is needed (Trip → Matching).
+- Synchronous (REST by default; gRPC only if the task asks): when an immediate answer is needed (Trip → Matching,
+  `TripLifecycle:MatchingTransport=Rest`, the MVP default). Trip → Matching can also run fully asynchronously over RabbitMQ
+  (`MatchingTransport=Events`: `QuoteRequestedV1`/`DriverMatchRequestedV1` request, `QuoteReadyV1`/`DriverMatchedV1`/`*FailedV1` reply).
 - Asynchronous (RabbitMQ via MassTransit): business events such as `TripAccepted`, `RideCompleted`,
   `PaymentSettled`, `PaymentFailed`. Pin the MassTransit version and check its license terms before major upgrades.
 - Shared integration-event contracts live in `src/SwiftRide.Contracts/`: plain records only, versioned

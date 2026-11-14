@@ -23,6 +23,8 @@ public sealed class MatchingRepository(MatchingDbContext db) : IDriverLocationRe
     }
     public async Task AddAsync(QuoteSnapshot quote, CancellationToken cancellationToken)
     {
+        // Idempotent: a redelivered quote request reuses the same deterministic id.
+        if (await db.Quotes.AnyAsync(q => q.Id == quote.Id, cancellationToken)) return;
         var p = quote.Pricing;
         db.Quotes.Add(new QuoteRow { Id = quote.Id, DistanceKm = p.DistanceKm, EstimatedMinutes = p.EstimatedMinutes,
             CostPerKm = p.CostPerKm, CostPerMinute = p.CostPerMinute, Surge = p.Surge, Toll = p.Toll,

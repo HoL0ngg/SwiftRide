@@ -8,4 +8,6 @@ public interface ITripEventWriter
     void Add(TripAcceptedV1 message);
     void Add(RideCompletedV1 message);
     void Add(PaymentCompensationRequestedV1 message);
+    void Add(QuoteRequestedV1 message);
+    void Add(DriverMatchRequestedV1 message);
 }

@@ -9,4 +9,6 @@ public sealed class NoOpTripEventWriter : ITripEventWriter
     public void Add(TripAcceptedV1 message) { }
     public void Add(RideCompletedV1 message) { }
     public void Add(PaymentCompensationRequestedV1 message) { }
+    public void Add(QuoteRequestedV1 message) { }
+    public void Add(DriverMatchRequestedV1 message) { }
 }
