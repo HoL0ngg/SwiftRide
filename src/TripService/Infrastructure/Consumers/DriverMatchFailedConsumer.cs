@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 using SwiftRide.Contracts.V1;
@@ -22,6 +23,59 @@ public sealed class DriverMatchFailedConsumer(
     public async Task Consume(ConsumeContext<DriverMatchFailedV1> context)
     {
         var message = context.Message;
+        using var messageScope = logger.BeginScope(
+            "EventType={EventType} EventId={EventId} TripId={TripId} CorrelationId={CorrelationId} CausationId={CausationId}",
+            nameof(DriverMatchFailedV1), message.EventId, message.TripId, message.CorrelationId, message.CausationId);
+        logger.LogInformation(
+            """
+            ==================== RABBITMQ MESSAGE RECEIVED [RECEIVED] ====================
+            [MESSAGE INFO]
+            MessageType        : {EventType}
+            EventId            : {EventId}
+            TripId             : {TripId}
+
+            [BUSINESS INFO]
+            ReasonCode         : {ReasonCode}
+
+            [CORRELATION INFO]
+            CorrelationId      : {CorrelationId}
+            CausationId        : {CausationId}
+
+            [RETRY INFO]
+            RetryAttempt       : {RetryAttempt}
+            RedeliveryCount    : {RedeliveryCount}
+
+            [MESSAGE CONTEXT]
+            TransportMessageId : {TransportMessageId}
+            Source             : {SourceAddress}
+            Destination        : {DestinationAddress}
+            InputAddress       : {InputAddress}
+
+            [CONTEXT.MESSAGE]
+            {ContextMessage}
+            =============================================================================
+            """,
+            nameof(DriverMatchFailedV1),
+            message.EventId,
+            message.TripId,
+            message.ReasonCode,
+            message.CorrelationId,
+            message.CausationId,
+            context.GetRetryAttempt(),
+            context.GetRedeliveryCount(),
+            context.MessageId,
+            context.SourceAddress,
+            context.DestinationAddress,
+            context.ReceiveContext?.InputAddress,
+            JsonSerializer.Serialize(new
+            {
+                message.EventId,
+                message.TripId,
+                message.ReasonCode,
+                message.OccurredAtUtc,
+                message.CorrelationId,
+                message.CausationId
+            }, new JsonSerializerOptions { WriteIndented = true }));
         var ct = context.CancellationToken;
 
         if (await InboxGate.IsProcessedAsync(db, ConsumerName, message.EventId, ct))
@@ -54,5 +108,6 @@ public sealed class DriverMatchFailedConsumer(
 
         InboxGate.MarkProcessed(db, ConsumerName, message.EventId, clock, note);
         await unitOfWork.SaveAsync(ct);
+        logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(DriverMatchFailedV1), message.EventId, message.TripId);
     }
 }

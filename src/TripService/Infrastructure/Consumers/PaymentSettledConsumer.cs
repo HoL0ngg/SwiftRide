@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Diagnostics;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
@@ -52,6 +53,65 @@ public sealed class PaymentSettledConsumer : IConsumer<PaymentSettledV1>
     public async Task Consume(ConsumeContext<PaymentSettledV1> context)
     {
         var message = context.Message;
+        using var messageScope = _logger.BeginScope(
+            "EventType={EventType} EventId={EventId} TripId={TripId} CorrelationId={CorrelationId} CausationId={CausationId}",
+            nameof(PaymentSettledV1), message.EventId, message.TripId, message.CorrelationId, message.CausationId);
+        _logger.LogInformation(
+            """
+            ==================== RABBITMQ MESSAGE RECEIVED [RECEIVED] ====================
+            [MESSAGE INFO]
+            MessageType        : {EventType}
+            EventId            : {EventId}
+            TripId             : {TripId}
+
+            [BUSINESS INFO]
+            PaymentId          : {PaymentId}
+            Amount             : {Amount}
+            Currency           : {Currency}
+
+            [CORRELATION INFO]
+            CorrelationId      : {CorrelationId}
+            CausationId        : {CausationId}
+
+            [RETRY INFO]
+            RetryAttempt       : {RetryAttempt}
+            RedeliveryCount    : {RedeliveryCount}
+
+            [MESSAGE CONTEXT]
+            TransportMessageId : {TransportMessageId}
+            Source             : {SourceAddress}
+            Destination        : {DestinationAddress}
+            InputAddress       : {InputAddress}
+
+            [CONTEXT.MESSAGE]
+            {ContextMessage}
+            =============================================================================
+            """,
+            nameof(PaymentSettledV1),
+            message.EventId,
+            message.TripId,
+            message.PaymentId,
+            message.Amount,
+            message.Currency,
+            message.CorrelationId,
+            message.CausationId,
+            context.GetRetryAttempt(),
+            context.GetRedeliveryCount(),
+            context.MessageId,
+            context.SourceAddress,
+            context.DestinationAddress,
+            context.ReceiveContext?.InputAddress,
+            JsonSerializer.Serialize(new
+            {
+                message.EventId,
+                message.TripId,
+                message.PaymentId,
+                message.Amount,
+                message.Currency,
+                message.OccurredAtUtc,
+                message.CorrelationId,
+                message.CausationId
+            }, new JsonSerializerOptions { WriteIndented = true }));
 
         Activity? consumerActivity = null;
         if (context.Headers is not null &&
@@ -120,6 +180,7 @@ public sealed class PaymentSettledConsumer : IConsumer<PaymentSettledV1>
             inboxEntry!.ProcessedAtUtc = DateTimeOffset.UtcNow;
             AttachInboxIfDetached(inboxEntry);
             await _unitOfWork.SaveAsync(context.CancellationToken);
+            _logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(PaymentSettledV1), message.EventId, message.TripId);
             return;
         }
 
@@ -132,6 +193,7 @@ public sealed class PaymentSettledConsumer : IConsumer<PaymentSettledV1>
             inboxEntry!.ProcessedAtUtc = DateTimeOffset.UtcNow;
             AttachInboxIfDetached(inboxEntry);
             await _unitOfWork.SaveAsync(context.CancellationToken);
+            _logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(PaymentSettledV1), message.EventId, message.TripId);
             return;
         }
 
@@ -149,6 +211,7 @@ public sealed class PaymentSettledConsumer : IConsumer<PaymentSettledV1>
                 inboxEntry!.ProcessedAtUtc = DateTimeOffset.UtcNow;
                 AttachInboxIfDetached(inboxEntry);
                 await _unitOfWork.SaveAsync(context.CancellationToken);
+                _logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(PaymentSettledV1), message.EventId, message.TripId);
                 return;
             }
 
@@ -187,6 +250,7 @@ public sealed class PaymentSettledConsumer : IConsumer<PaymentSettledV1>
                     inboxEntry!.ProcessedAtUtc = DateTimeOffset.UtcNow;
                     AttachInboxIfDetached(inboxEntry);
                     await _unitOfWork.SaveAsync(context.CancellationToken);
+                    _logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(PaymentSettledV1), message.EventId, message.TripId);
                     return;
                 }
             }
@@ -221,6 +285,7 @@ public sealed class PaymentSettledConsumer : IConsumer<PaymentSettledV1>
         inboxEntry!.ProcessedAtUtc = DateTimeOffset.UtcNow;
         AttachInboxIfDetached(inboxEntry);
         await _unitOfWork.SaveAsync(context.CancellationToken);
+        _logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(PaymentSettledV1), message.EventId, message.TripId);
         }
     }
 

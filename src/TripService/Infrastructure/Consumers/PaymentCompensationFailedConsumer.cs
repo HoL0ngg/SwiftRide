@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -29,6 +30,65 @@ public sealed class PaymentCompensationFailedConsumer : IConsumer<PaymentCompens
     public async Task Consume(ConsumeContext<PaymentCompensationFailedV1> context)
     {
         var message = context.Message;
+        using var messageScope = _logger.BeginScope(
+            "EventType={EventType} EventId={EventId} TripId={TripId} CorrelationId={CorrelationId} CausationId={CausationId}",
+            nameof(PaymentCompensationFailedV1), message.EventId, message.TripId, message.CorrelationId, message.CausationId);
+        _logger.LogInformation(
+            """
+            ==================== RABBITMQ MESSAGE RECEIVED [RECEIVED] ====================
+            [MESSAGE INFO]
+            MessageType        : {EventType}
+            EventId            : {EventId}
+            TripId             : {TripId}
+
+            [BUSINESS INFO]
+            PaymentId          : {PaymentId}
+            RefundId           : {RefundId}
+            ReasonCode         : {ReasonCode}
+
+            [CORRELATION INFO]
+            CorrelationId      : {CorrelationId}
+            CausationId        : {CausationId}
+
+            [RETRY INFO]
+            RetryAttempt       : {RetryAttempt}
+            RedeliveryCount    : {RedeliveryCount}
+
+            [MESSAGE CONTEXT]
+            TransportMessageId : {TransportMessageId}
+            Source             : {SourceAddress}
+            Destination        : {DestinationAddress}
+            InputAddress       : {InputAddress}
+
+            [CONTEXT.MESSAGE]
+            {ContextMessage}
+            =============================================================================
+            """,
+            nameof(PaymentCompensationFailedV1),
+            message.EventId,
+            message.TripId,
+            message.PaymentId,
+            message.RefundId,
+            message.ReasonCode,
+            message.CorrelationId,
+            message.CausationId,
+            context.GetRetryAttempt(),
+            context.GetRedeliveryCount(),
+            context.MessageId,
+            context.SourceAddress,
+            context.DestinationAddress,
+            context.ReceiveContext?.InputAddress,
+            JsonSerializer.Serialize(new
+            {
+                message.EventId,
+                message.TripId,
+                message.PaymentId,
+                message.RefundId,
+                message.ReasonCode,
+                message.OccurredAtUtc,
+                message.CorrelationId,
+                message.CausationId
+            }, new JsonSerializerOptions { WriteIndented = true }));
         var consumerName = typeof(PaymentCompensationFailedConsumer).FullName ?? nameof(PaymentCompensationFailedConsumer);
 
         // 1. Inbox deduplication
@@ -77,6 +137,7 @@ public sealed class PaymentCompensationFailedConsumer : IConsumer<PaymentCompens
         inboxEntry.LastError = message.SafeErrorMessage;
         AttachInboxIfDetached(inboxEntry);
         await _unitOfWork.SaveAsync(context.CancellationToken);
+        _logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(PaymentCompensationFailedV1), message.EventId, message.TripId);
     }
 
     private void AttachInboxIfDetached(IntegrationInboxRecord entry)

@@ -1,6 +1,8 @@
 using MassTransit;
 using MassTransit.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using SwiftRide.Contracts.V1;
 using SwiftRide.MatchingService.Application;
@@ -18,13 +20,15 @@ public class MatchingConsumerTests
 
     private static readonly DateTimeOffset Now = new Clock().GetUtcNow();
 
-    private static ServiceProvider BuildProvider(DriverLocation[] drivers, Mock<IQuoteWriter> quoteWriter)
+    private static ServiceProvider BuildProvider(DriverLocation[] drivers, Mock<IQuoteWriter> quoteWriter,
+        Mock<ILogger<QuoteRequestedConsumer>>? logger = null)
     {
         var reader = new Mock<IDriverLocationReader>();
         reader.Setup(r => r.ReadAvailableAsync(It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>())).ReturnsAsync(drivers);
 
         return new ServiceCollection()
             .AddLogging()
+            .AddSingleton<ILogger<QuoteRequestedConsumer>>(logger?.Object ?? NullLogger<QuoteRequestedConsumer>.Instance)
             .AddSingleton<TimeProvider>(new Clock())
             .AddSingleton(new MatchingOptions())
             .AddSingleton<IPricingStrategy, StandardPricingStrategy>()
@@ -52,6 +56,52 @@ public class MatchingConsumerTests
         Mode: mode,
         OccurredAtUtc: Now,
         CorrelationId: "corr-1");
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task QuoteRequested_LogsReceivedAndPublished_WithLinkedEventIds(bool hasDriver)
+    {
+        var logger = new Mock<ILogger<QuoteRequestedConsumer>>();
+        var writer = new Mock<IQuoteWriter>();
+        writer.Setup(w => w.AddAsync(It.IsAny<QuoteSnapshot>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        await using var provider = BuildProvider(hasDriver ? OneDriverNearOrigin() : [], writer, logger);
+        var harness = provider.GetRequiredService<ITestHarness>();
+        await harness.Start();
+        var request = QuoteRequest();
+
+        await harness.Bus.Publish(request);
+        Assert.True(await harness.GetConsumerHarness<QuoteRequestedConsumer>().Consumed.Any<QuoteRequestedV1>());
+        var replyId = hasDriver
+            ? harness.Published.Select<QuoteReadyV1>().Single().Context.Message.EventId
+            : harness.Published.Select<QuoteFailedV1>().Single().Context.Message.EventId;
+        var logs = logger.Invocations.Where(i => i.Method.Name == "Log")
+            .Select(i => i.Arguments[2]!.ToString()!).ToArray();
+
+        Assert.Contains(logs, line => line.Contains("[RECEIVED]") &&
+            line.Contains(request.EventId.ToString()) && line.Contains(request.TripId.ToString()) &&
+            line.Contains(request.CorrelationId));
+        Assert.Contains(logs, line => line.Contains("[PUBLISHED]") &&
+            line.Contains(replyId.ToString()) && line.Contains(request.EventId.ToString()) &&
+            line.Contains(request.TripId.ToString()) && line.Contains(request.CorrelationId));
+        var received = Assert.Single(logs, line => line.Contains("[RECEIVED]"));
+        Assert.Contains("RABBITMQ MESSAGE RECEIVED", received);
+        Assert.Contains("\n", received);
+        Assert.Contains("[MESSAGE INFO]", received);
+        Assert.Contains("[CORRELATION INFO]", received);
+        Assert.Contains("[RETRY INFO]", received);
+        Assert.Contains("[MESSAGE CONTEXT]", received);
+        Assert.Contains("InputAddress", received);
+        Assert.Contains("[CONTEXT.MESSAGE]", received);
+        Assert.Contains("\"TripId\": \"" + request.TripId + "\"", received);
+        Assert.Contains("\"Mode\": \"standard\"", received);
+        Assert.DoesNotContain("PickupLatitude", received);
+        var published = Assert.Single(logs, line => line.Contains("[PUBLISHED]"));
+        Assert.Contains("RABBITMQ MESSAGE PUBLISHED", published);
+        Assert.Contains("\n", published);
+        Assert.Contains("[MESSAGE CONTEXT]", published);
+    }
 
     [Fact]
     public async Task QuoteRequested_WithDriverAvailable_PublishesQuoteReady_AndStoresQuoteUnderRequestId()

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Diagnostics;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
@@ -52,21 +53,13 @@ public sealed class RideCompletedConsumer : IConsumer<RideCompletedV1>
         {
             var consumerName = typeof(RideCompletedConsumer).FullName ?? nameof(RideCompletedConsumer);
 
-            // Scope: moi log ben duoi deu mang theo cac field nay de de filter
-            using var scope = _logger.BeginScope(new Dictionary<string, object?>
-            {
-                ["EventId"] = message.EventId,
-                ["TripId"] = message.TripId,
-                ["CorrelationId"] = message.CorrelationId,
-                ["TransportMessageId"] = context.MessageId,
-                ["TraceId"] = consumerActivity?.TraceId.ToString()
-            });
-
-            // 0. Log ngay khi message duoc consumer nhan (truoc moi xu ly)
-          
+            using var scope = _logger.BeginScope(
+                "EventType={EventType} EventId={EventId} TripId={TripId} CorrelationId={CorrelationId} CausationId={CausationId} TransportMessageId={TransportMessageId} TraceId={TraceId}",
+                nameof(RideCompletedV1), message.EventId, message.TripId, message.CorrelationId,
+                message.CausationId, context.MessageId, consumerActivity?.TraceId.ToString());
             _logger.LogInformation(
                 """
-                ==================== RABBITMQ MESSAGE RECEIVED ====================
+                ==================== RABBITMQ MESSAGE RECEIVED [RECEIVED] ====================
                 [MESSAGE INFO]
                 MessageType       : {MessageType}
                 EventId           : {EventId}
@@ -82,17 +75,22 @@ public sealed class RideCompletedConsumer : IConsumer<RideCompletedV1>
 
                 [CORRELATION INFO]
                 CorrelationId     : {CorrelationId}
+                CausationId       : {CausationId}
 
                 [RETRY INFO]
                 RetryAttempt      : {RetryAttempt}
                 RedeliveryCount   : {RedeliveryCount}
 
                 [MESSAGE CONTEXT]
+                TransportMessageId: {TransportMessageId}
                 Source            : {SourceAddress}
                 Destination       : {DestinationAddress}
-                Queue             : {InputAddress}
+                InputAddress       : {InputAddress}
 
-                
+                [CONTEXT.MESSAGE]
+                {ContextMessage}
+
+
                 ====================================================================
                 """,
                 nameof(RideCompletedV1),
@@ -105,11 +103,26 @@ public sealed class RideCompletedConsumer : IConsumer<RideCompletedV1>
                 message.PaymentMethod,
                 message.PaymentIdempotencyKey,
                 message.CorrelationId,
+                message.CausationId,
                 context.GetRetryAttempt(),
                 context.GetRedeliveryCount(),
+                context.MessageId,
                 context.SourceAddress,
                 context.DestinationAddress,
-                context.ReceiveContext.InputAddress
+                context.ReceiveContext?.InputAddress,
+                JsonSerializer.Serialize(new
+                {
+                    message.EventId,
+                    message.TripId,
+                    message.QuoteId,
+                    message.FareAmount,
+                    message.FareCurrency,
+                    message.PaymentMethod,
+                    message.PaymentIdempotencyKey,
+                    message.OccurredAtUtc,
+                    message.CorrelationId,
+                    message.CausationId
+                }, new JsonSerializerOptions { WriteIndented = true })
             );
 
 
@@ -252,7 +265,7 @@ public sealed class RideCompletedConsumer : IConsumer<RideCompletedV1>
                 AttachInboxIfDetached(inboxEntry);
                 await _dbContext.SaveChangesAsync(context.CancellationToken);
 
-                _logger.LogInformation("[DONE] {EventId} marked processed (idempotency conflict).", message.EventId);
+                _logger.LogInformation("[PROCESSED] {EventId} marked processed (idempotency conflict).", message.EventId);
                 return;
             }
             catch (DomainException ex)
@@ -282,7 +295,7 @@ public sealed class RideCompletedConsumer : IConsumer<RideCompletedV1>
                 AttachInboxIfDetached(inboxEntry);
                 await _dbContext.SaveChangesAsync(context.CancellationToken);
 
-                _logger.LogInformation("[DONE] {EventId} marked processed (domain error).", message.EventId);
+                _logger.LogInformation("[PROCESSED] {EventId} marked processed (domain error).", message.EventId);
                 return;
             }
             catch (Exception ex)
@@ -338,7 +351,7 @@ public sealed class RideCompletedConsumer : IConsumer<RideCompletedV1>
                     AttachInboxIfDetached(inboxEntry);
                     await _dbContext.SaveChangesAsync(context.CancellationToken);
 
-                    _logger.LogInformation("[DONE] {EventId} marked processed (max attempts exceeded).", message.EventId);
+                    _logger.LogInformation("[PROCESSED] {EventId} marked processed (max attempts exceeded).", message.EventId);
                     return;
                 }
 
@@ -403,7 +416,7 @@ public sealed class RideCompletedConsumer : IConsumer<RideCompletedV1>
             await _dbContext.SaveChangesAsync(context.CancellationToken);
 
             _logger.LogInformation(
-                "[DONE] {EventId} for trip {TripId} processed successfully (PaymentStatus={Status}).",
+                "[PROCESSED] {EventId} for trip {TripId} processed successfully (PaymentStatus={Status}).",
                 message.EventId, message.TripId, result.Payment.Status);
         }
     }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 using SwiftRide.Contracts.V1;
@@ -23,6 +24,68 @@ public sealed class QuoteReadyConsumer(
     public async Task Consume(ConsumeContext<QuoteReadyV1> context)
     {
         var message = context.Message;
+        using var messageScope = logger.BeginScope(
+            "EventType={EventType} EventId={EventId} TripId={TripId} CorrelationId={CorrelationId} CausationId={CausationId}",
+            nameof(QuoteReadyV1), message.EventId, message.TripId, message.CorrelationId, message.CausationId);
+        logger.LogInformation(
+            """
+            ==================== RABBITMQ MESSAGE RECEIVED [RECEIVED] ====================
+            [MESSAGE INFO]
+            MessageType        : {EventType}
+            EventId            : {EventId}
+            TripId             : {TripId}
+
+            [BUSINESS INFO]
+            QuoteId            : {QuoteId}
+            Amount             : {Amount}
+            Currency           : {Currency}
+            CandidateDriverId  : {CandidateDriverId}
+
+            [CORRELATION INFO]
+            CorrelationId      : {CorrelationId}
+            CausationId        : {CausationId}
+
+            [RETRY INFO]
+            RetryAttempt       : {RetryAttempt}
+            RedeliveryCount    : {RedeliveryCount}
+
+            [MESSAGE CONTEXT]
+            TransportMessageId : {TransportMessageId}
+            Source             : {SourceAddress}
+            Destination        : {DestinationAddress}
+            InputAddress       : {InputAddress}
+
+            [CONTEXT.MESSAGE]
+            {ContextMessage}
+            =============================================================================
+            """,
+            nameof(QuoteReadyV1),
+            message.EventId,
+            message.TripId,
+            message.QuoteId,
+            message.Amount,
+            message.Currency,
+            message.CandidateDriverId,
+            message.CorrelationId,
+            message.CausationId,
+            context.GetRetryAttempt(),
+            context.GetRedeliveryCount(),
+            context.MessageId,
+            context.SourceAddress,
+            context.DestinationAddress,
+            context.ReceiveContext?.InputAddress,
+            JsonSerializer.Serialize(new
+            {
+                message.EventId,
+                message.TripId,
+                message.QuoteId,
+                message.Amount,
+                message.Currency,
+                message.CandidateDriverId,
+                message.OccurredAtUtc,
+                message.CorrelationId,
+                message.CausationId
+            }, new JsonSerializerOptions { WriteIndented = true }));
         var ct = context.CancellationToken;
 
         if (await InboxGate.IsProcessedAsync(db, ConsumerName, message.EventId, ct))
@@ -36,6 +99,7 @@ public sealed class QuoteReadyConsumer(
         {
             logger.LogWarning("QuoteReadyV1 received for unknown trip {TripId}", message.TripId);
             await CompleteAsync(message, "TripNotFound", ct);
+            logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(QuoteReadyV1), message.EventId, message.TripId);
             return;
         }
 
@@ -44,6 +108,7 @@ public sealed class QuoteReadyConsumer(
             // Stale or duplicate reply (trip already quoted, cancelled or failed).
             logger.LogInformation("QuoteReadyV1 ignored for trip {TripId} in status {Status}", message.TripId, ctx.Trip.Status);
             await CompleteAsync(message, $"IgnoredInStatus:{ctx.Trip.Status}", ct);
+            logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(QuoteReadyV1), message.EventId, message.TripId);
             return;
         }
 
@@ -64,6 +129,7 @@ public sealed class QuoteReadyConsumer(
         ctx.UpdatedAt = clock.GetUtcNow();
         writer.Update(ctx);
         await CompleteAsync(message, null, ct);
+        logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(QuoteReadyV1), message.EventId, message.TripId);
         logger.LogInformation("Trip {TripId} quoted via event: driver {DriverId}, fare {Fare} {Currency}",
             message.TripId, message.CandidateDriverId, message.Amount, message.Currency);
     }

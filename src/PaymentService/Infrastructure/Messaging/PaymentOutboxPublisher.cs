@@ -125,6 +125,23 @@ public sealed class PaymentOutboxPublisher : BackgroundService
                 await PublishMessageAsync(publishEndpoint, candidate.EventType, candidate.PayloadJson, traceToPropagate, timeoutCts.Token);
 
                 publishSuccess = true;
+                _logger.LogInformation(
+                    """
+                    ==================== RABBITMQ MESSAGE PUBLISHED [PUBLISHED] ===================
+                    [MESSAGE INFO]
+                    MessageType        : {EventType}
+                    EventId            : {EventId}
+
+                    [CORRELATION INFO]
+                    CorrelationId      : {CorrelationId}
+                    CausationId        : {CausationId}
+
+                    [MESSAGE CONTEXT]
+                    Exchange           : SwiftRide.Contracts.V1:{ExchangeEventType}
+                    Attempt            : {Attempt}
+                    =============================================================================
+                    """,
+                    candidate.EventType, candidate.MessageId, candidate.CorrelationId, candidate.CausationId, candidate.EventType, candidate.Attempts + 1);
             }
             catch (Exception ex)
             {
@@ -169,6 +186,9 @@ public sealed class PaymentOutboxPublisher : BackgroundService
                 var baseDelay = Math.Min(60.0, Math.Pow(2, Math.Min(10, toUpdate.Attempts - 1)));
                 var jitter = baseDelay * (Random.Shared.NextDouble() * 0.25);
                 toUpdate.NextAttemptUtc = completionTime.AddSeconds(baseDelay + jitter);
+                _logger.LogWarning(
+                    "[OUTBOX_RETRY] {EventType} EventId={EventId} CorrelationId={CorrelationId} Attempt={Attempt} NextAttemptUtc={NextAttemptUtc}",
+                    candidate.EventType, candidate.MessageId, candidate.CorrelationId, toUpdate.Attempts, toUpdate.NextAttemptUtc);
                 toUpdate.Owner = null;
                 toUpdate.LeaseUntilUtc = null;
             }

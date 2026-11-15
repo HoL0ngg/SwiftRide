@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 using SwiftRide.Contracts.V1;
@@ -30,6 +31,62 @@ public sealed class DriverMatchedConsumer(
     public async Task Consume(ConsumeContext<DriverMatchedV1> context)
     {
         var message = context.Message;
+        using var messageScope = logger.BeginScope(
+            "EventType={EventType} EventId={EventId} TripId={TripId} CorrelationId={CorrelationId} CausationId={CausationId}",
+            nameof(DriverMatchedV1), message.EventId, message.TripId, message.CorrelationId, message.CausationId);
+        logger.LogInformation(
+            """
+            ==================== RABBITMQ MESSAGE RECEIVED [RECEIVED] ====================
+            [MESSAGE INFO]
+            MessageType        : {EventType}
+            EventId            : {EventId}
+            TripId             : {TripId}
+
+            [BUSINESS INFO]
+            DriverId           : {DriverId}
+            DistanceKm         : {DistanceKm}
+
+            [CORRELATION INFO]
+            CorrelationId      : {CorrelationId}
+            CausationId        : {CausationId}
+
+            [RETRY INFO]
+            RetryAttempt       : {RetryAttempt}
+            RedeliveryCount    : {RedeliveryCount}
+
+            [MESSAGE CONTEXT]
+            TransportMessageId : {TransportMessageId}
+            Source             : {SourceAddress}
+            Destination        : {DestinationAddress}
+            InputAddress       : {InputAddress}
+
+            [CONTEXT.MESSAGE]
+            {ContextMessage}
+            =============================================================================
+            """,
+            nameof(DriverMatchedV1),
+            message.EventId,
+            message.TripId,
+            message.DriverId,
+            message.DistanceKm,
+            message.CorrelationId,
+            message.CausationId,
+            context.GetRetryAttempt(),
+            context.GetRedeliveryCount(),
+            context.MessageId,
+            context.SourceAddress,
+            context.DestinationAddress,
+            context.ReceiveContext?.InputAddress,
+            JsonSerializer.Serialize(new
+            {
+                message.EventId,
+                message.TripId,
+                message.DriverId,
+                message.DistanceKm,
+                message.OccurredAtUtc,
+                message.CorrelationId,
+                message.CausationId
+            }, new JsonSerializerOptions { WriteIndented = true }));
         var ct = context.CancellationToken;
 
         if (await InboxGate.IsProcessedAsync(db, ConsumerName, message.EventId, ct))
@@ -43,6 +100,7 @@ public sealed class DriverMatchedConsumer(
         {
             logger.LogWarning("DriverMatchedV1 received for unknown trip {TripId}", message.TripId);
             await CompleteAsync(message, "TripNotFound", ct);
+            logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(DriverMatchedV1), message.EventId, message.TripId);
             return;
         }
 
@@ -53,6 +111,7 @@ public sealed class DriverMatchedConsumer(
             logger.LogInformation("DriverMatchedV1 ignored for trip {TripId} in status {Status} (rematchPending={Pending})",
                 message.TripId, trip.Status, trip.IsRematchPending);
             await CompleteAsync(message, $"IgnoredInStatus:{trip.Status}", ct);
+            logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(DriverMatchedV1), message.EventId, message.TripId);
             return;
         }
 
@@ -66,6 +125,7 @@ public sealed class DriverMatchedConsumer(
             ctx.UpdatedAt = now;
             writer.Update(ctx);
             await CompleteAsync(message, null, ct);
+            logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(DriverMatchedV1), message.EventId, message.TripId);
             logger.LogInformation("Trip {TripId} offered to driver {DriverId} via event", trip.Id, message.DriverId);
             return;
         }
@@ -85,6 +145,7 @@ public sealed class DriverMatchedConsumer(
             ctx.UpdatedAt = now;
             writer.Update(ctx);
             await CompleteAsync(message, "TooManyBusyDrivers", ct);
+            logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(DriverMatchedV1), message.EventId, message.TripId);
             logger.LogInformation("Trip {TripId}: too many busy drivers ({Count}), trip failed", trip.Id, busyCount);
             return;
         }
@@ -100,6 +161,7 @@ public sealed class DriverMatchedConsumer(
             CorrelationId: message.CorrelationId,
             CausationId: message.EventId));
         await CompleteAsync(message, "DriverBusy", ct);
+        logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(DriverMatchedV1), message.EventId, message.TripId);
     }
 
     private Task CompleteAsync(DriverMatchedV1 message, string? note, CancellationToken ct)

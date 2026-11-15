@@ -8,6 +8,126 @@ RabbitMQ trong dự án không có partition/offset như Kafka. Không gọi que
 
 ## 1. Chuẩn bị môi trường
 
+### Theo dõi hành trình message bằng log service
+
+Các consumer của Trip, Matching và Payment ghi log nhận message theo mẫu của commit `3c56e1d`.
+Hai outbox publisher và Matching ghi thêm log sau khi lệnh publish hoàn tất. Log nhận/gửi được
+trình bày thành khối nhiều dòng, chia nhóm như Payment Service: message, nghiệp vụ, correlation,
+retry và transport. Console giữ xuống dòng (`SingleLine=false`), timestamp và scope chứa mã chuyến/event.
+`InputAddress` hiển thị trực tiếp `context.ReceiveContext.InputAddress` (trước đây ghi nhãn `Queue`).
+Nhóm `[CONTEXT.MESSAGE]` hiển thị JSON thụt dòng từ các trường được chọn của `context.Message`:
+mã event/chuyến, dữ liệu nghiệp vụ cần demo, thời điểm phát sinh và mã liên kết. Đây là bản xem
+có chọn lọc, không phải serialize toàn bộ message: bỏ token, tọa độ, danh sách tài xế bị loại và
+nội dung lỗi tự do để tránh ghi dữ liệu không cần thiết. Không ghi `ReceiveContext.Body` thô.
+
+Sau khi cấu hình môi trường ở các bước dưới, rebuild các service để nhận code mới:
+
+```powershell
+docker compose --profile messaging up -d --build trip-service matching-service payment-service
+docker compose --profile messaging logs -f --tail 300 trip-service matching-service payment-service
+```
+
+Lệnh trên giữ toàn bộ khối log, cả lý do bỏ qua message trùng, lỗi nghiệp vụ và lỗi MassTransit.
+Không lọc bằng `Select-String '\[(PUBLISHED|RECEIVED)\]'` khi trình bày: bộ lọc chỉ giữ dòng tiêu đề,
+làm mất các trường ở những dòng sau. Có thể mở log riêng của `trip-service`, `matching-service`,
+`payment-service` trong ba terminal hoặc ba tab Docker Desktop để tránh các khối xen kẽ.
+
+Muốn tra nhanh mã chuyến/event theo `CorrelationId` (chỉ hiển thị dòng khớp, không giữ cả khối):
+
+```powershell
+$demoCorrelationId = 'demo-rabbitmq-01'
+docker compose --profile messaging logs -f --tail 200 trip-service matching-service payment-service |
+    Select-String -SimpleMatch $demoCorrelationId
+```
+
+Gửi header `X-Correlation-Id: demo-rabbitmq-01` khi gọi Gateway để có mã dễ tìm. Không tái sử dụng
+mã này cho nhiều lượt demo chạy đồng thời.
+
+| Mốc | Cách giải thích khi trình bày |
+|---|---|
+| `[PUBLISHED]` | Lệnh publish hoàn tất; có tên exchange và EventId. Chưa chứng minh consumer nhận hoặc xử lý xong. |
+| `[RECEIVED]` | Consumer nhận một lượt giao; có queue, EventId, TripId, TransportMessageId, retry/redelivery. |
+| `[PROCESSED]` | Consumer đã lưu kết quả xử lý, hoặc Matching đã publish câu trả lời. Có thể là kết quả thất bại nghiệp vụ; không đồng nghĩa chuyến đã Paid và không phải log ACK từ broker. |
+| `[OUTBOX_RETRY]` | Publisher lên lịch thử gửi lại; có số lần thất bại và thời điểm thử tiếp theo. |
+
+`EventId` xác định event nghiệp vụ; `TransportMessageId` là mã message của MassTransit, có thể khác.
+Event trả lời có EventId mới và `CausationId` trỏ về EventId yêu cầu. Outbox log có EventId,
+CorrelationId và CausationId; dùng chúng nối sang dòng `[RECEIVED]` có TripId. Scope của Matching
+vẫn mô tả event đầu vào, còn các trường ngay sau `[PUBLISHED]` mô tả event trả lời.
+
+Luồng thành công để trình bày:
+
+```text
+Trip     [PUBLISHED] QuoteRequestedV1  EventId=A
+Matching [RECEIVED]  QuoteRequestedV1  EventId=A  Queue=matching-quote-requested
+Matching [PUBLISHED] QuoteReadyV1      EventId=B  CausationId=A
+Trip     [RECEIVED]  QuoteReadyV1      EventId=B  Queue=trip-quote-ready
+Trip     [PROCESSED] QuoteReadyV1      EventId=B
+... xác nhận giá, tài xế nhận chuyến, đón và trả khách ...
+Trip     [PUBLISHED] RideCompletedV1   EventId=C
+Payment  [RECEIVED]  RideCompletedV1   EventId=C  Queue=payment-ride-completed
+Payment  [PUBLISHED] PaymentSettledV1  EventId=D  CausationId=C
+Trip     [RECEIVED]  PaymentSettledV1  EventId=D  Queue=trip-payment-settled
+Trip     [PROCESSED] PaymentSettledV1  EventId=D
+```
+
+Ví dụ đã lược bỏ scope và dùng A/B/C/D thay GUID. Log nhiều container có thể xen kẽ;
+consumer có thể ghi `[RECEIVED]` trước khi publisher kịp ghi `[PUBLISHED]`. Đối chiếu các mã,
+không suy luận thứ tự tuyệt đối từ vị trí dòng trên terminal.
+
+Cần `MESSAGING_TRANSPORT=RabbitMQ`; để demo Matching qua event, thêm
+`TRIP_LIFECYCLE_MATCHING_TRANSPORT=Events`. Khi tạo chuyến, chọn `PaymentTransport=Events`
+để thanh toán đi qua broker. REST không tạo các message tương ứng. Không cần đổi
+`infra/rabbitmq/definitions.json` hoặc bật ghi toàn bộ payload; logger không bổ sung token,
+tọa độ hay nội dung request vào log.
+
+Log vận hành của chính broker xem riêng bằng
+`docker compose --profile messaging logs -f --tail 100 rabbitmq`.
+
+Ví dụ bố cục khối log nhận tại Trip (mã đã rút gọn):
+
+```text
+==================== RABBITMQ MESSAGE RECEIVED [RECEIVED] ====================
+[MESSAGE INFO]
+MessageType        : QuoteReadyV1
+EventId            : B
+TripId             : T
+
+[BUSINESS INFO]
+QuoteId            : Q
+Amount             : 45000
+Currency           : VND
+CandidateDriverId  : driver-demo
+
+[CORRELATION INFO]
+CorrelationId      : demo-rabbitmq-01
+CausationId        : A
+
+[RETRY INFO]
+RetryAttempt       : 0
+RedeliveryCount    : 0
+
+[MESSAGE CONTEXT]
+TransportMessageId : transport-message-id
+Source             : rabbitmq://rabbitmq/matching-service...
+Destination        : rabbitmq://rabbitmq/SwiftRide.Contracts.V1:QuoteReadyV1
+InputAddress       : rabbitmq://rabbitmq/trip-quote-ready
+
+[CONTEXT.MESSAGE]
+{
+  "EventId": "B",
+  "TripId": "T",
+  "QuoteId": "Q",
+  "Amount": 45000,
+  "Currency": "VND",
+  "CandidateDriverId": "driver-demo",
+  "OccurredAtUtc": "2026-11-15T02:00:00+00:00",
+  "CorrelationId": "demo-rabbitmq-01",
+  "CausationId": "A"
+}
+=============================================================================
+```
+
 ### Bước 1: Mở Docker Desktop và terminal
 
 Mở Docker Desktop, chờ engine hoạt động. Mở PowerShell tại thư mục dự án:
