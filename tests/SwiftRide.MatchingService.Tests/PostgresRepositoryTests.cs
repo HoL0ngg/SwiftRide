@@ -44,6 +44,9 @@ public class PostgresRepositoryTests
                 await cmd.ExecuteNonQueryAsync();
             }
             catch (PostgresException ex) when (ex.SqlState == "42P07") { }
+
+            cmd.CommandText = await File.ReadAllTextAsync(Path.Combine(root!.FullName, "database/supabase/matchdb-vehicle-types.sql"));
+            await cmd.ExecuteNonQueryAsync();
         }
 
         await using var db = new MatchingDbContext(new DbContextOptionsBuilder<MatchingDbContext>().UseNpgsql(connection).Options);
@@ -55,12 +58,13 @@ public class PostgresRepositoryTests
         var repository = new MatchingRepository(db);
         var now = DateTimeOffset.UtcNow;
         await repository.UpsertAsync(new("driver-1", new(10, 106), true, now), default);
-        await repository.UpsertAsync(new("driver-1", new(11, 107), true, now.AddSeconds(1)), default);
+        await repository.UpsertAsync(new("driver-1", new(11, 107), true, now.AddSeconds(1), "car"), default);
         await repository.UpsertAsync(new("driver-1", new(9, 105), false, now.AddSeconds(-1)), default);
         var driver = Assert.Single(await repository.ReadAvailableAsync(now.AddMinutes(-5), default));
         Assert.Equal(11, driver.Position.Latitude);
         Assert.Equal(107, driver.Position.Longitude);
-        var snapshot = new QuoteSnapshot(Guid.NewGuid(), new PricingContext(5, 10, 10000, 1000, 1.2m, 5000, .9m, .08m), 74844, "VND", now);
+        Assert.Equal("car", driver.VehicleType);
+        var snapshot = new QuoteSnapshot(Guid.NewGuid(), new PricingContext(5, 10, 10000, 1000, 1.2m, 5000, .9m, .08m), 74844, "VND", now, "car");
         await repository.AddAsync(snapshot, default);
         db.ChangeTracker.Clear();
         var quote = await db.Quotes.SingleAsync();
@@ -68,6 +72,7 @@ public class PostgresRepositoryTests
         Assert.Equal(74844, quote.Amount);
         Assert.Equal(.9m, quote.PromotionFactor);
         Assert.Equal(1.2m, quote.Surge);
+        Assert.Equal("car", quote.VehicleType);
         Assert.Equal("matchdb", db.Model.FindEntityType(typeof(QuoteRow))!.GetSchema());
         await transaction.RollbackAsync();
     }

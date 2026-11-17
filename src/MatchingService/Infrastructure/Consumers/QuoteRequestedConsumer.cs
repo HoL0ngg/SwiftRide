@@ -82,7 +82,7 @@ public sealed class QuoteRequestedConsumer(
             var pickup = new GeoPoint(request.PickupLatitude, request.PickupLongitude);
             var destination = new GeoPoint(request.DestinationLatitude, request.DestinationLongitude);
 
-            var match = await matchDriver.ExecuteAsync(pickup, [], ct);
+            var match = await matchDriver.ExecuteAsync(pickup, [], ct, request.VehicleType);
             if (match.Candidate is null)
             {
                 logger.LogInformation("No driver available for trip {TripId}", request.TripId);
@@ -90,7 +90,7 @@ public sealed class QuoteRequestedConsumer(
                 return;
             }
 
-            var quote = await createQuote.ExecuteAsync(pickup, destination, request.Mode, ct, request.EventId);
+            var quote = await createQuote.ExecuteAsync(pickup, destination, request.Mode, ct, request.EventId, request.VehicleType);
 
             var reply = new QuoteReadyV1(
                 EventId: Guid.NewGuid(),

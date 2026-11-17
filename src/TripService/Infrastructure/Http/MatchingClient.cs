@@ -35,7 +35,8 @@ public sealed class MatchingClient : IMatchingClient
         {
             latitude = input.Pickup.Latitude,
             longitude = input.Pickup.Longitude,
-            excludedDriverIds = input.ExcludedDriverIds
+            excludedDriverIds = input.ExcludedDriverIds,
+            vehicleType = input.VehicleType
         };
 
         var attempts = 0;
@@ -142,7 +143,8 @@ public sealed class MatchingClient : IMatchingClient
         {
             pickup = new { latitude = input.Pickup.Latitude, longitude = input.Pickup.Longitude },
             destination = new { latitude = input.Destination.Latitude, longitude = input.Destination.Longitude },
-            mode = input.Mode
+            mode = input.Mode,
+            vehicleType = input.VehicleType
         };
 
         using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(4));

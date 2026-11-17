@@ -63,7 +63,8 @@ public sealed class TripRepository : ITripReader, ITripWriter
             UpdatedAt = context.UpdatedAt,
             RowVersion = context.RowVersion,
             PaymentTransport = context.PaymentTransport,
-            PricingMode = context.PricingMode
+            PricingMode = context.PricingMode,
+            VehicleType = context.VehicleType
         };
 
         if (snap.RejectedDriverIds != null)
@@ -134,6 +135,7 @@ public sealed class TripRepository : ITripReader, ITripWriter
         record.EstimatedMinutes = context.EstimatedMinutes;
         record.PaymentTransport = context.PaymentTransport;
         record.PricingMode = context.PricingMode;
+        record.VehicleType = context.VehicleType;
         record.UpdatedAt = DateTimeOffset.UtcNow;
 
         if (snap.RejectedDriverIds != null)

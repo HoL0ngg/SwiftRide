@@ -43,6 +43,9 @@ Thiết kế này thay pipeline `IFareStep` cũ, giữ nguyên API, quote snapsh
 
 ## API hiện có
 
+Loại xe `motorbike`/`car` độc lập với `mode`. Đơn giá, lọc tài xế và cập nhật
+schema được mô tả trong [hướng dẫn loại xe](vehicle-types.md).
+
 ### Giả lập giá ban đêm
 
 `mode` hỗ trợ `standard` và `night`. Giao diện Rider có nút **Giả lập ban đêm** trước

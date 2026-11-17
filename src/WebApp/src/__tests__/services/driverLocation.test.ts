@@ -25,13 +25,13 @@ describe('driverLocation heartbeat', () => {
     // Flush initial immediate call
     await vi.advanceTimersByTimeAsync(0);
     expect(updateLocation).toHaveBeenCalledTimes(1);
-    expect(updateLocation).toHaveBeenCalledWith('drv-1', 10.77, 106.69, true);
+    expect(updateLocation).toHaveBeenCalledWith('drv-1', 10.77, 106.69, true, 'motorbike');
 
     // After 30s, sends second heartbeat
     coords.latitude = 10.78;
     await vi.advanceTimersByTimeAsync(30_000);
     expect(updateLocation).toHaveBeenCalledTimes(2);
-    expect(updateLocation).toHaveBeenLastCalledWith('drv-1', 10.78, 106.69, true);
+    expect(updateLocation).toHaveBeenLastCalledWith('drv-1', 10.78, 106.69, true, 'motorbike');
 
     heartbeat.stop();
   });
@@ -43,16 +43,18 @@ describe('driverLocation heartbeat', () => {
       getCoordinates: () => ({ latitude: 10.77, longitude: 106.69 }),
       updateLocation,
       intervalMs: 30_000,
+      vehicleType: 'car',
     });
 
     heartbeat.start();
     await vi.advanceTimersByTimeAsync(0);
     expect(updateLocation).toHaveBeenCalledTimes(1);
+    expect(updateLocation).toHaveBeenLastCalledWith('drv-1', 10.77, 106.69, true, 'car');
 
     heartbeat.stop();
     await vi.advanceTimersByTimeAsync(0);
     expect(updateLocation).toHaveBeenCalledTimes(2);
-    expect(updateLocation).toHaveBeenLastCalledWith('drv-1', 10.77, 106.69, false);
+    expect(updateLocation).toHaveBeenLastCalledWith('drv-1', 10.77, 106.69, false, 'car');
 
     // Advancing timer should not trigger more calls
     await vi.advanceTimersByTimeAsync(60_000);

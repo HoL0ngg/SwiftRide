@@ -13,6 +13,46 @@ namespace SwiftRide.TripService.Tests.Application;
 
 public class CreateTripTests
 {
+    [Theory]
+    [InlineData("motorbike", "motorbike")]
+    [InlineData(" CAR ", "car")]
+    public async Task Create_PreservesVehicleTypeForMatchingQuoteAndReadModel(string requested, string expected)
+    {
+        _matchingClient.Setup(m => m.MatchAsync(It.Is<MatchInput>(i => i.VehicleType == expected), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MatchOutcome(MatchStatus.Matched, new CandidateDriver("drv-1", 1)));
+        _matchingClient.Setup(m => m.QuoteAsync(It.Is<QuoteInput>(i => i.VehicleType == expected && i.Mode == "night"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new QuotedFare(Guid.NewGuid(), 120000m, "VND", 5m, 15m, DateTimeOffset.UtcNow));
+
+        var result = await CreateSut().ExecuteAsync(ValidCommand() with { VehicleType = requested, Mode = "night" }, default);
+
+        Assert.Equal(expected, result.Trip.VehicleType);
+        Assert.Equal("120000", result.Trip.FareAmount);
+        Assert.Equal("night", result.Trip.PricingMode);
+    }
+
+    [Theory]
+    [InlineData("bus")]
+    [InlineData("")]
+    [InlineData(null)]
+    public async Task Create_RejectsInvalidVehicleType(string? vehicleType)
+    {
+        await Assert.ThrowsAsync<InvalidTripCommandException>(() =>
+            CreateSut().ExecuteAsync(ValidCommand() with { VehicleType = vehicleType! }, default));
+        _writer.Verify(w => w.Add(It.IsAny<TripContext>()), Times.Never);
+    }
+
+    [Fact]
+    public void VehicleFingerprint_DefaultIsMotorbike_AndCarIsDistinctAndNormalized()
+    {
+        var command = ValidCommand();
+        Assert.Equal("motorbike", command.VehicleType);
+        var original = CreateTripUseCase.ComputeRequestHash(command);
+        Assert.Equal(original, CreateTripUseCase.ComputeRequestHash(command with { VehicleType = " MOTORBIKE " }));
+        var car = CreateTripUseCase.ComputeRequestHash(command with { VehicleType = "car" });
+        Assert.NotEqual(original, car);
+        Assert.Equal(car, CreateTripUseCase.ComputeRequestHash(command with { VehicleType = " CAR " }));
+    }
+
     [Fact]
     public async Task Create_NightMode_UsesMatchingAndReturnsPersistedMode()
     {

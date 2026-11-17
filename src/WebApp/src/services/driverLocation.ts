@@ -1,3 +1,5 @@
+import type { VehicleType } from '../types/tripTypes';
+
 export interface DriverHeartbeatOptions {
   driverId: string;
   getCoordinates: () => { latitude: number; longitude: number };
@@ -5,9 +7,11 @@ export interface DriverHeartbeatOptions {
     driverId: string,
     latitude: number,
     longitude: number,
-    isOnline: boolean
+    isOnline: boolean,
+    vehicleType?: VehicleType
   ) => Promise<void>;
   intervalMs?: number;
+  vehicleType?: VehicleType;
 }
 
 export interface DriverHeartbeat {
@@ -17,7 +21,7 @@ export interface DriverHeartbeat {
 }
 
 export function createDriverHeartbeat(options: DriverHeartbeatOptions): DriverHeartbeat {
-  const { driverId, getCoordinates, updateLocation, intervalMs = 30_000 } = options;
+  const { driverId, getCoordinates, updateLocation, intervalMs = 30_000, vehicleType = 'motorbike' } = options;
   let timerId: ReturnType<typeof setInterval> | null = null;
   let inFlight = false;
   let running = false;
@@ -27,7 +31,7 @@ export function createDriverHeartbeat(options: DriverHeartbeatOptions): DriverHe
     inFlight = true;
     try {
       const coords = getCoordinates();
-      await updateLocation(driverId, coords.latitude, coords.longitude, isOnline);
+      await updateLocation(driverId, coords.latitude, coords.longitude, isOnline, vehicleType);
     } catch {
       // Bounded error logging/handling; do not crash
     } finally {

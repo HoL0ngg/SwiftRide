@@ -99,7 +99,7 @@ public sealed class TripWorkCoordinator(
         var pickup = new GeoCoordinate(context.PickupLat, context.PickupLon);
         var dest = new GeoCoordinate(context.DestLat, context.DestLon);
 
-        var match = await matchingClient.MatchAsync(new MatchInput(pickup, Array.Empty<string>()), ct);
+        var match = await matchingClient.MatchAsync(new MatchInput(pickup, Array.Empty<string>(), context.VehicleType), ct);
         if (match.Status == MatchStatus.NoDriverAvailable || match.Candidate is null)
         {
             context.Trip.FailNoDriverAvailable();
@@ -109,7 +109,7 @@ public sealed class TripWorkCoordinator(
             return true;
         }
 
-        var quote = await matchingClient.QuoteAsync(new QuoteInput(pickup, dest, context.PricingMode), ct);
+        var quote = await matchingClient.QuoteAsync(new QuoteInput(pickup, dest, context.PricingMode, context.VehicleType), ct);
         context.Trip.ApplyQuote(new FareSnapshot(quote.QuoteId, quote.Amount, quote.Currency), match.Candidate.DriverId);
         context.DistanceKm = quote.DistanceKm;
         context.EstimatedMinutes = quote.EstimatedMinutes;

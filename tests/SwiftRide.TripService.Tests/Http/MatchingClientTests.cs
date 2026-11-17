@@ -8,6 +8,33 @@ namespace SwiftRide.TripService.Tests.Http;
 
 public class MatchingClientTests
 {
+    [Fact]
+    public async Task MatchAndQuote_SendSelectedVehicleTypeOverHttp()
+    {
+        var handler = new TestHttpMessageHandler
+        {
+            Handler = async (request, ct) =>
+            {
+                using var payload = System.Text.Json.JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct));
+                Assert.Equal("car", payload.RootElement.GetProperty("vehicleType").GetString());
+                var json = request.RequestUri!.AbsolutePath == "/match"
+                    ? """{"status":"NoDriverAvailable","candidate":null}"""
+                    : $$"""{"quoteId":"{{Guid.NewGuid()}}","amount":120000,"currency":"VND","distanceKm":5,"estimatedMinutes":15,"createdAt":"2026-11-17T00:00:00Z"}""";
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
+                };
+            }
+        };
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://matching") };
+        var client = new MatchingClient(httpClient);
+
+        await client.MatchAsync(new MatchInput(new(10, 106), [], "car"), default);
+        await client.QuoteAsync(new QuoteInput(new(10, 106), new(11, 107), "night", "car"), default);
+
+        Assert.Equal(2, handler.RequestCount);
+    }
+
     private class TestHttpMessageHandler : HttpMessageHandler
     {
         public Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? Handler { get; set; }

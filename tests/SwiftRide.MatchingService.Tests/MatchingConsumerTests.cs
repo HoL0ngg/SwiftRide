@@ -105,19 +105,23 @@ public class MatchingConsumerTests
     }
 
     [Theory]
-    [InlineData("standard", 7500)]
-    [InlineData("night", 9000)]
-    public async Task QuoteRequested_WithDriverAvailable_PublishesQuoteReady_AndStoresQuoteUnderRequestId(string mode, decimal costPerKm)
+    [InlineData("standard", "motorbike", 7500)]
+    [InlineData("night", "motorbike", 9000)]
+    [InlineData("standard", "car", 15000)]
+    [InlineData("night", "car", 18000)]
+    public async Task QuoteRequested_WithDriverAvailable_PublishesQuoteReady_AndStoresQuoteUnderRequestId(string mode, string vehicleType, decimal costPerKm)
     {
         var writer = new Mock<IQuoteWriter>();
         QuoteSnapshot? saved = null;
         writer.Setup(w => w.AddAsync(It.IsAny<QuoteSnapshot>(), It.IsAny<CancellationToken>()))
             .Callback<QuoteSnapshot, CancellationToken>((q, _) => saved = q).Returns(Task.CompletedTask);
-        await using var provider = BuildProvider(OneDriverNearOrigin(), writer);
+        DriverLocation[] drivers = [new("wrong-type", new(0, 0), true, Now, vehicleType == "car" ? "motorbike" : "car"),
+            new("drv-1", new(0, .01), true, Now, vehicleType)];
+        await using var provider = BuildProvider(drivers, writer);
         var harness = provider.GetRequiredService<ITestHarness>();
         await harness.Start();
 
-        var request = QuoteRequest(mode: mode);
+        var request = QuoteRequest(mode: mode) with { VehicleType = vehicleType };
         await harness.Bus.Publish(request);
 
         Assert.True(await harness.Consumed.Any<QuoteRequestedV1>());
@@ -132,6 +136,7 @@ public class MatchingConsumerTests
         Assert.Equal(request.EventId, reply.QuoteId);
         Assert.Equal(request.EventId, saved!.Id);
         Assert.Equal(costPerKm, saved.Pricing.CostPerKm);
+        Assert.Equal(vehicleType, saved.VehicleType);
         Assert.False(await harness.Published.Any<QuoteFailedV1>());
     }
 
@@ -169,8 +174,9 @@ public class MatchingConsumerTests
     {
         DriverLocation[] drivers =
         [
-            new("drv-near", new GeoPoint(0, 0.01), true, Now),
-            new("drv-far", new GeoPoint(0, 0.03), true, Now)
+            new("bike-nearest", new GeoPoint(0, 0), true, Now),
+            new("drv-near", new GeoPoint(0, 0.01), true, Now, "car"),
+            new("drv-far", new GeoPoint(0, 0.03), true, Now, "car")
         ];
         await using var provider = BuildProvider(drivers, new Mock<IQuoteWriter>());
         var harness = provider.GetRequiredService<ITestHarness>();
@@ -178,7 +184,7 @@ public class MatchingConsumerTests
 
         var tripId = Guid.NewGuid();
         await harness.Bus.Publish(new DriverMatchRequestedV1(
-            Guid.NewGuid(), tripId, 0, 0, ["drv-near"], Now, "corr-2"));
+            Guid.NewGuid(), tripId, 0, 0, ["drv-near"], Now, "corr-2", VehicleType: "car"));
 
         Assert.True(await harness.Published.Any<DriverMatchedV1>());
         var reply = harness.Published.Select<DriverMatchedV1>().Single().Context.Message;

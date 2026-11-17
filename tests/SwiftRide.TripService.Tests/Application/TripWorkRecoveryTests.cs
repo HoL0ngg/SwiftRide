@@ -45,7 +45,7 @@ public class TripWorkRecoveryTests
         var trip = Trip.Request(tripId, "rider-1", 3);
         var context = new TripContext(
             trip, "PName", "PAddr", 10.76, 106.66, "DName", "DAddr", 10.78, 106.70,
-            "card", "card.success.v1", null, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+            "card", "card.success.v1", null, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, vehicleType: "car");
 
         _reader
             .Setup(r => r.LoadAsync(tripId, It.IsAny<CancellationToken>()))
@@ -64,6 +64,8 @@ public class TripWorkRecoveryTests
         Assert.True(success);
         Assert.Equal("Quoted", trip.Status.ToString());
         Assert.Equal("drv-99", trip.CandidateDriverId);
+        _matchingClient.Verify(m => m.MatchAsync(It.Is<MatchInput>(i => i.VehicleType == "car"), It.IsAny<CancellationToken>()), Times.Once);
+        _matchingClient.Verify(m => m.QuoteAsync(It.Is<QuoteInput>(i => i.VehicleType == "car"), It.IsAny<CancellationToken>()), Times.Once);
         _writer.Verify(w => w.Update(context), Times.Once);
         _uow.Verify(u => u.SaveAsync(It.IsAny<CancellationToken>()), Times.Once);
     }

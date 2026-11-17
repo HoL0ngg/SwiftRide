@@ -58,6 +58,10 @@ services:
       Geocoding__SearchUrl: ${GEOCODING_SEARCH_URL:-https://nominatim.openstreetmap.org/search}
       Geocoding__UserAgent: ${GEOCODING_USER_AGENT:-SwiftRideCourseDemo/1.0}
       Matching__SeedDemoDrivers: ${MATCHING_SEED_DEMO_DRIVERS:-false}
+      Matching__CostPerKm: ${MATCHING_COST_PER_KM:-7500}
+      Matching__CostPerMinute: ${MATCHING_COST_PER_MINUTE:-300}
+      Matching__CarCostPerKm: ${MATCHING_CAR_COST_PER_KM:-15000}
+      Matching__CarCostPerMinute: ${MATCHING_CAR_COST_PER_MINUTE:-600}
       Messaging__Transport: ${MESSAGING_TRANSPORT:-None}
       RabbitMQ__Host: ${RABBITMQ_HOST:-}
       RabbitMQ__Username: ${RABBITMQ_USER:-guest}

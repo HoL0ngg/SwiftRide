@@ -9,4 +9,5 @@ public sealed record DriverMatchRequestedV1(
     IReadOnlyList<string> ExcludedDriverIds,
     DateTimeOffset OccurredAtUtc,
     string CorrelationId,
-    Guid? CausationId = null);
+    Guid? CausationId = null,
+    string VehicleType = "motorbike");

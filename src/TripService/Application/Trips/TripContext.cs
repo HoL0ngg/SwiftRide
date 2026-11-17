@@ -22,7 +22,8 @@ public sealed class TripContext
         DateTimeOffset updatedAt,
         byte[]? rowVersion = null,
         string paymentTransport = "Rest",
-        string pricingMode = "standard")
+        string pricingMode = "standard",
+        string vehicleType = "motorbike")
     {
         Trip = trip ?? throw new ArgumentNullException(nameof(trip));
         PickupName = pickupName;
@@ -42,6 +43,7 @@ public sealed class TripContext
         RowVersion = rowVersion;
         PaymentTransport = paymentTransport;
         PricingMode = pricingMode;
+        VehicleType = vehicleType;
     }
 
     public Trip Trip { get; }
@@ -62,4 +64,5 @@ public sealed class TripContext
     public byte[]? RowVersion { get; set; }
     public string PaymentTransport { get; set; }
     public string PricingMode { get; set; }
+    public string VehicleType { get; }
 }

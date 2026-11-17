@@ -1,5 +1,5 @@
 import { Check, History, X } from 'lucide-react';
-import type { TripResponse } from '../../types/tripTypes';
+import { vehicleLabel, type TripResponse } from '../../types/tripTypes';
 import { formatVnd } from '../../utils/money';
 import StatusPill from './StatusPill';
 
@@ -42,6 +42,7 @@ export default function TripHistoryList({ items, emptyTitle, emptyHint }: Props)
               </h3>
               <p className="caption" style={{ marginTop: 2 }}>
                 {new Date(item.createdAt).toLocaleString('vi-VN')}
+                {' · '}{vehicleLabel(item.vehicleType)}
               </p>
               <div style={{ marginTop: 8 }}>
                 <StatusPill tone={status.tone}>{status.text}</StatusPill>

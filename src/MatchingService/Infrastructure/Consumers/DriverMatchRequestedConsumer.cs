@@ -72,7 +72,7 @@ public sealed class DriverMatchRequestedConsumer(
 
         try
         {
-            var match = await matchDriver.ExecuteAsync(new GeoPoint(request.PickupLatitude, request.PickupLongitude), excluded, ct);
+            var match = await matchDriver.ExecuteAsync(new GeoPoint(request.PickupLatitude, request.PickupLongitude), excluded, ct, request.VehicleType);
             if (match.Candidate is null)
             {
                 logger.LogInformation("No driver available for trip {TripId} after {Excluded} exclusions", request.TripId, excluded.Count);

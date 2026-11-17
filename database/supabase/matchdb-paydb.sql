@@ -10,6 +10,7 @@ grant usage on schema paydb to swiftride_payment;
 
 create table matchdb.driver_locations (
     driver_id text primary key check (length(btrim(driver_id)) > 0),
+    vehicle_type text not null default 'motorbike' check (vehicle_type in ('motorbike', 'car')),
     latitude double precision not null check (latitude between -90 and 90),
     longitude double precision not null check (longitude between -180 and 180),
     is_online boolean not null default false,
@@ -21,6 +22,7 @@ create index driver_locations_online_updated_idx
 
 create table matchdb.quotes (
     id uuid primary key default gen_random_uuid(),
+    vehicle_type text not null default 'motorbike' check (vehicle_type in ('motorbike', 'car')),
     distance_km numeric not null check (distance_km >= 0 and distance_km < 'Infinity'::numeric),
     estimated_minutes numeric not null check (estimated_minutes >= 0 and estimated_minutes < 'Infinity'::numeric),
     cost_per_km numeric not null check (cost_per_km >= 0 and cost_per_km < 'Infinity'::numeric),

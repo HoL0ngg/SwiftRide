@@ -59,7 +59,7 @@ public class EventMatchingTests
         _rider, "key-1", new GeoCoordinate(10.762622, 106.660172), "Ben Thanh", "District 1",
         new GeoCoordinate(10.776889, 106.700806), "Landmark 81", "Binh Thanh", "card", "standard");
 
-    private static TripContext Context(TripStatus status, Guid quoteId, string? offered = null, string[]? rejected = null)
+    private static TripContext Context(TripStatus status, Guid quoteId, string? offered = null, string[]? rejected = null, string vehicleType = "motorbike")
     {
         rejected ??= [];
         var fare = new FareSnapshot(quoteId, 50_000m, "VND");
@@ -76,7 +76,7 @@ public class EventMatchingTests
             null,
             null);
         return new TripContext(Trip.Restore(snapshot), "P", "A", 10.76, 106.66, "D", "A", 10.78, 106.72,
-            "card", "card.success.v1", 5m, 15m, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+            "card", "card.success.v1", 5m, 15m, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, vehicleType: vehicleType);
     }
 
     [Fact]
@@ -88,13 +88,15 @@ public class EventMatchingTests
         CommandReceipt? receipt = null;
         _receiptStore.Setup(r => r.Add(It.IsAny<CommandReceipt>())).Callback<CommandReceipt>(r => receipt = r);
 
-        var result = await sut.ExecuteAsync(ValidCreate(), CancellationToken.None);
+        var result = await sut.ExecuteAsync(ValidCreate() with { VehicleType = "car" }, CancellationToken.None);
 
         Assert.True(result.IsPendingWork);
         Assert.Equal("Requested", result.Trip.Status);
         Assert.NotNull(staged);
         Assert.Equal(result.Trip.Id, staged!.TripId);
         Assert.Equal("standard", staged.Mode);
+        Assert.Equal("car", staged.VehicleType);
+        Assert.Equal("car", result.Trip.VehicleType);
         Assert.Equal(10.762622, staged.PickupLatitude);
         Assert.Equal(106.700806, staged.DestinationLongitude);
         // The REST matching worker must not pick this trip up: the receipt is completed immediately.
@@ -124,7 +126,7 @@ public class EventMatchingTests
     {
         var sut = CreateCommandSut();
         var quoteId = Guid.NewGuid();
-        var ctx = Context(TripStatus.Quoted, quoteId);
+        var ctx = Context(TripStatus.Quoted, quoteId, vehicleType: "car");
         _reader.Setup(r => r.LoadAsync(ctx.Trip.Id, It.IsAny<CancellationToken>())).ReturnsAsync(ctx);
         DriverMatchRequestedV1? staged = null;
         _eventWriter.Setup(w => w.Add(It.IsAny<DriverMatchRequestedV1>())).Callback<DriverMatchRequestedV1>(m => staged = m);
@@ -137,6 +139,7 @@ public class EventMatchingTests
         Assert.NotNull(staged);
         Assert.Equal(ctx.Trip.Id, staged!.TripId);
         Assert.Empty(staged.ExcludedDriverIds);
+        Assert.Equal("car", staged.VehicleType);
         _assignmentStore.Verify(a => a.TryClaimDriver(It.IsAny<string>(), It.IsAny<Guid>()), Times.Never);
         _uow.Verify(u => u.SaveAsync(It.IsAny<CancellationToken>()), Times.Once);
         _matchingClient.VerifyNoOtherCalls();
@@ -146,7 +149,7 @@ public class EventMatchingTests
     public async Task DriverReject_WithEventMatching_StagesRematchExcludingRejectedDrivers()
     {
         var sut = CreateCommandSut();
-        var ctx = Context(TripStatus.DriverOffered, Guid.NewGuid(), offered: "drv-1", rejected: ["old-1"]);
+        var ctx = Context(TripStatus.DriverOffered, Guid.NewGuid(), offered: "drv-1", rejected: ["old-1"], vehicleType: "car");
         _reader.Setup(r => r.LoadAsync(ctx.Trip.Id, It.IsAny<CancellationToken>())).ReturnsAsync(ctx);
         DriverMatchRequestedV1? staged = null;
         _eventWriter.Setup(w => w.Add(It.IsAny<DriverMatchRequestedV1>())).Callback<DriverMatchRequestedV1>(m => staged = m);
@@ -157,6 +160,7 @@ public class EventMatchingTests
         Assert.Null(outcome.Trip.OfferedDriverId);
         Assert.NotNull(staged);
         Assert.Equal(["old-1", "drv-1"], staged!.ExcludedDriverIds);
+        Assert.Equal("car", staged.VehicleType);
         _assignmentStore.Verify(a => a.ReleaseDriver(ctx.Trip.Id), Times.Once);
         _matchingClient.VerifyNoOtherCalls();
     }

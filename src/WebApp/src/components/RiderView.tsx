@@ -18,7 +18,7 @@ import {
 import type { Place } from '../types/place';
 import type { TripStore } from '../store/tripStore';
 import type { AuthSession } from '../services/auth';
-import type { TripStatus } from '../types/tripTypes';
+import { vehicleLabel, type TripStatus, type VehicleType } from '../types/tripTypes';
 import { useTripState } from '../store/useTrip';
 import { formatVnd } from '../utils/money';
 import AddressSearch from './AddressSearch';
@@ -120,6 +120,7 @@ export default function RiderView({
 }: Props) {
   const backendState = useTripState(store);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'card'>('wallet');
+  const [vehicleType, setVehicleType] = useState<VehicleType>('motorbike');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
   const submitting = useRef(false);
@@ -177,6 +178,7 @@ export default function RiderView({
 
   return (
     <section aria-label="Đặt chuyến cho hành khách">
+      {rawTrip && <p className="caption" style={{ marginBottom: 8 }}>{vehicleLabel(rawTrip.vehicleType)}</p>}
       {rawTrip?.pricingMode === 'night' && (
         <p className="caption" style={{ marginBottom: 12 }}><Moon size={14} aria-hidden="true" /> Giá ban đêm · Giả lập</p>
       )}
@@ -201,6 +203,7 @@ export default function RiderView({
                   destinationName: destination.name,
                   destinationAddress: destination.address,
                   paymentMethod,
+                  vehicleType,
                   mode: nightMode ? 'night' : 'standard',
                 })
               );
@@ -238,6 +241,16 @@ export default function RiderView({
               />
             </div>
 
+            <hr className="divider" />
+            <div className="option-grid" role="group" aria-label="Loại xe">
+              {(['motorbike', 'car'] as const).map(value => (
+                <button key={value} type="button" className="option" disabled={loading}
+                  aria-pressed={vehicleType === value} onClick={() => setVehicleType(value)}>
+                  {vehicleLabel(value)}
+                  {vehicleType === value && <Check size={16} aria-hidden="true" />}
+                </button>
+              ))}
+            </div>
             <hr className="divider" />
             <button type="button" className="option" aria-pressed={nightMode}
               disabled={loading} onClick={() => onNightModeChange?.(!nightMode)}>

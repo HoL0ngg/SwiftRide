@@ -12,9 +12,9 @@ public sealed record CoordinateRequest(double? Latitude, double? Longitude)
     public GeoPoint ToPoint() => Latitude.HasValue && Longitude.HasValue
         ? new(Latitude.Value, Longitude.Value) : throw new MatchingDomainException("Latitude and longitude are required.");
 }
-public sealed record LocationRequest(double? Latitude, double? Longitude, bool? IsOnline);
-public sealed record MatchRequest(double? Latitude, double? Longitude, string[]? ExcludedDriverIds);
-public sealed record QuoteRequest(CoordinateRequest? Pickup, CoordinateRequest? Destination, string? Mode);
+public sealed record LocationRequest(double? Latitude, double? Longitude, bool? IsOnline, string VehicleType = "motorbike");
+public sealed record MatchRequest(double? Latitude, double? Longitude, string[]? ExcludedDriverIds, string VehicleType = "motorbike");
+public sealed record QuoteRequest(CoordinateRequest? Pickup, CoordinateRequest? Destination, string? Mode, string VehicleType = "motorbike");
 
 public static class MatchingEndpoints
 {
@@ -24,7 +24,7 @@ public static class MatchingEndpoints
         {
             if (user.FindFirstValue("sub") != id) return Results.Forbid();
             if (!request.IsOnline.HasValue) throw new MatchingDomainException("Online status is required.");
-            await useCase.ExecuteAsync(id, new CoordinateRequest(request.Latitude, request.Longitude).ToPoint(), request.IsOnline.Value, ct);
+            await useCase.ExecuteAsync(id, new CoordinateRequest(request.Latitude, request.Longitude).ToPoint(), request.IsOnline.Value, ct, request.VehicleType);
             return Results.NoContent();
         }).RequireAuthorization(policy => policy.RequireRole("driver"));
 
@@ -73,7 +73,7 @@ public static class MatchingEndpoints
         internalGroup.MapPost("/match", async (MatchRequest request, MatchDriver useCase, CancellationToken ct) =>
         {
             var start = Stopwatch.GetTimestamp();
-            var result = await useCase.ExecuteAsync(new CoordinateRequest(request.Latitude, request.Longitude).ToPoint(), request.ExcludedDriverIds ?? [], ct);
+            var result = await useCase.ExecuteAsync(new CoordinateRequest(request.Latitude, request.Longitude).ToPoint(), request.ExcludedDriverIds ?? [], ct, request.VehicleType);
             var elapsedMs = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
             MatchingTelemetry.MatchingDuration.Record(elapsedMs);
             return Results.Ok(result);
@@ -82,7 +82,7 @@ public static class MatchingEndpoints
         internalGroup.MapPost("/quote", async (QuoteRequest request, CreateQuote useCase, CancellationToken ct) =>
         {
             if (request.Pickup is null || request.Destination is null) throw new MatchingDomainException("Pickup and destination are required.");
-            var quote = await useCase.ExecuteAsync(request.Pickup.ToPoint(), request.Destination.ToPoint(), request.Mode ?? "standard", ct);
+            var quote = await useCase.ExecuteAsync(request.Pickup.ToPoint(), request.Destination.ToPoint(), request.Mode ?? "standard", ct, vehicleType: request.VehicleType);
             return Results.Json(quote, statusCode: 201);
         });
 

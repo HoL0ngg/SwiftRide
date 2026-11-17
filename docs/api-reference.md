@@ -4,6 +4,11 @@
 
 ## 1. Quy ước và kết nối
 
+**Bổ sung loại xe:** tạo Trip, cập nhật vị trí tài xế, quote và match nhận
+`vehicleType`: `motorbike` (mặc định) hoặc `car`; response Trip trả lại trường
+này. Chỉ ghép tài xế đúng loại xe. `mode` thường/ban đêm vẫn độc lập; fingerprint
+tạo chuyến phân biệt loại xe. Xem [hướng dẫn và cập nhật database](vehicle-types.md).
+
 - Base URL cho client: `http://localhost:5080` (YARP Gateway).
 - JSON dùng `camelCase`, gửi `Content-Type: application/json` khi có body. GET và các lệnh driver không có body.
 - ID chuyến, quote và payment là UUID. ID người dùng/tài xế là chuỗi từ claim `sub`.
@@ -75,6 +80,7 @@ Idempotency-Key: <unique-create-key>
 | `pickupName`, `pickupAddress`, `destinationName`, `destinationAddress` | string / null | Tùy chọn; thiếu/null được lưu thành chuỗi rỗng |
 | `paymentMethod` | string | `card` hoặc `wallet`; thiếu/null được endpoint mặc định `card`; nên gửi rõ giá trị |
 | `mode` | string | Tùy chọn, mặc định `standard`; hỗ trợ `standard`, `night` theo cấu hình server |
+| `vehicleType` | string | Tùy chọn, mặc định `motorbike`; hỗ trợ `motorbike`, `car`; độc lập với `mode` |
 | `paymentTransport` | string / null | Tùy chọn kỹ thuật cho demo: `Rest` hoặc `Events`; thường bỏ để dùng cấu hình server. Gửi `Events` khi messaging tắt trả `400` |
 | `demoPaymentOutcome` | string / null | Chỉ Development: `success`, `declined`, `timeout`; bỏ trường này dùng mock thành công. Ngoài Development trả `400` nếu gửi trường này. Xem [demo Postman](postman-demo.md) |
 
@@ -118,14 +124,14 @@ Ví dụ minh họa hình dạng dữ liệu, UUID/giá/thời gian không phả
 `quoteId`, `fareAmount`, `currency`, `distanceKm`, `estimatedMinutes` có thể null trước khi báo giá. Các ID driver có thể null tùy giai đoạn. Timestamps là ISO 8601 có offset. `status` là chuỗi tên trạng thái.
 
 `TripResponse` còn có `pricingMode` (`standard` hoặc `night`), lấy từ snapshot mode
-đã lưu trong Trip, để client hiển thị đúng chế độ sau khi tải lại trang.
+đã lưu trong Trip, và `vehicleType` (`motorbike` hoặc `car`) để client hiển thị đúng lựa chọn sau khi tải lại trang.
 
 Luồng chính: `Requested → Quoted → DriverOffered → DriverAccepted → EnRoute → PickedUp → DroppedOff → PaymentPending → Paid`. Endpoint dropoff thực hiện cả bước yêu cầu thanh toán, nên không nhất thiết quan sát được `DroppedOff` qua HTTP. `Paid`, `Cancelled`, `Failed` là terminal; `PaymentPending` chưa kết thúc. Không coi `200` của dropoff là thanh toán thành công: đọc `status` và polling nếu cần. Khi thanh toán hết retry vẫn lỗi, chuyến giữ `PaymentPending`.
 
 ### Idempotency cho Trip
 
 - `POST /trips` bắt buộc `Idempotency-Key`. Cùng actor, cùng key và nội dung nghiệp vụ tương đương trả lại cùng chuyến; thay đổi nội dung được fingerprint kiểm tra trả `409`.
-- Fingerprint tạo chuyến hiện dùng actor, tọa độ làm tròn 6 số thập phân, payment method và mode; **không gồm tên/địa chỉ và paymentTransport**. Không dùng replay để cập nhật các trường này. Response replay phản ánh trạng thái hiện tại, không bảo đảm JSON giống hệt lần đầu.
+- Fingerprint tạo chuyến dùng actor, tọa độ làm tròn 6 số thập phân, payment method, mode và loại xe; **không gồm tên/địa chỉ và paymentTransport**. Mặc định xe 2 bánh giữ fingerprint cũ. Không dùng replay để cập nhật các trường này. Response replay phản ánh trạng thái hiện tại, không bảo đảm JSON giống hệt lần đầu.
 - `demoPaymentOutcome=declined/timeout` được phân biệt trong fingerprint; bỏ trường hoặc `success` giữ fingerprint thành công như trước.
 - Các lệnh còn lại nhận header này tùy chọn; nếu bỏ, server sinh key cố định theo action và trip. Gửi key riêng cho mỗi thao tác mới, giữ nguyên khi retry. Với driver-reject, tài xế mới phải dùng danh tính của mình sau rematch.
 - Confirm phải dùng đúng `quoteId` đang gắn với chuyến. Giá được giữ nguyên khi rider xác nhận và khi rematch. Vượt giới hạn từ chối `k` (mặc định 3), hoặc không còn tài xế phù hợp, chuyến có thể `Failed`.

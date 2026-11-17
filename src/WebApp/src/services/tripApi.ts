@@ -4,6 +4,7 @@ import type {
   DriverFeedApiResponse,
   TripHistoryPageApiResponse,
   TripResponse,
+  VehicleType,
 } from '../types/tripTypes';
 
 export interface TripApi {
@@ -23,7 +24,8 @@ export interface TripApi {
     driverId: string,
     latitude: number,
     longitude: number,
-    isOnline: boolean
+    isOnline: boolean,
+    vehicleType?: VehicleType
   ): Promise<void>;
 }
 
@@ -191,6 +193,7 @@ export function createTripApi(session: AuthSession): TripApi {
         destinationAddress: input.destinationAddress ?? '',
         paymentMethod: input.paymentMethod,
         mode: input.mode ?? 'standard',
+        vehicleType: input.vehicleType ?? 'motorbike',
       };
       const result = await request<TripResponse>('/trips', { method: 'POST', body: JSON.stringify(body) }, key);
       clearActionKey('create-trip', 'new');
@@ -249,7 +252,8 @@ export function createTripApi(session: AuthSession): TripApi {
       driverId: string,
       latitude: number,
       longitude: number,
-      isOnline: boolean
+      isOnline: boolean,
+      vehicleType: VehicleType = 'motorbike'
     ) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -261,7 +265,7 @@ export function createTripApi(session: AuthSession): TripApi {
             Authorization: authHeader,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ latitude, longitude, isOnline }),
+          body: JSON.stringify({ latitude, longitude, isOnline, vehicleType }),
           signal: controller.signal,
         });
         if (!response.ok) {

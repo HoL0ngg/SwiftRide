@@ -8,19 +8,22 @@ public sealed class CreateQuote(IQuoteWriter writer, IEnumerable<IPricingStrateg
     /// Optional deterministic id. Message consumers pass an id derived from the request so a redelivered
     /// request maps to the same stored quote (idempotent).
     /// </param>
-    public async Task<QuoteResult> ExecuteAsync(GeoPoint pickup, GeoPoint destination, string mode, CancellationToken cancellationToken, Guid? quoteId = null)
+    public async Task<QuoteResult> ExecuteAsync(GeoPoint pickup, GeoPoint destination, string mode, CancellationToken cancellationToken, Guid? quoteId = null, string vehicleType = "motorbike")
     {
+        vehicleType = VehicleTypes.Normalize(vehicleType);
         var strategy = strategies.FirstOrDefault(s => string.Equals(s.Mode, mode.Trim(), StringComparison.OrdinalIgnoreCase))
             ?? throw new MatchingDomainException("Unsupported pricing mode.");
         var distance = (decimal)pickup.DistanceKmTo(destination);
         decimal minutes;
         try { minutes = distance / options.AverageSpeedKph * 60; }
         catch (OverflowException) { throw new MatchingDomainException("Estimated duration exceeds the supported range."); }
-        var context = strategy.PrepareContext(new PricingContext(distance, minutes, options.CostPerKm, options.CostPerMinute,
+        var costPerKm = vehicleType == VehicleTypes.Car ? options.CarCostPerKm : options.CostPerKm;
+        var costPerMinute = vehicleType == VehicleTypes.Car ? options.CarCostPerMinute : options.CostPerMinute;
+        var context = strategy.PrepareContext(new PricingContext(distance, minutes, costPerKm, costPerMinute,
             options.Surge, options.Toll, options.PromotionFactor, options.Tax));
         var amount = new FareCalculator(strategy).Calculate(context, options.Rounding);
-        var quote = new QuoteSnapshot(quoteId ?? Guid.NewGuid(), context, amount, "VND", clock.GetUtcNow());
+        var quote = new QuoteSnapshot(quoteId ?? Guid.NewGuid(), context, amount, "VND", clock.GetUtcNow(), vehicleType);
         await writer.AddAsync(quote, cancellationToken);
-        return new(quote.Id, amount, quote.Currency, distance, minutes, context, quote.CreatedAt);
+        return new(quote.Id, amount, quote.Currency, distance, minutes, context, quote.CreatedAt, vehicleType);
     }
 }

@@ -14,7 +14,8 @@ public sealed record CreateTripCommand(
     string PaymentMethod,
     string Mode = "standard",
     string? PaymentTransport = null,
-    string? DemoPaymentOutcome = null);
+    string? DemoPaymentOutcome = null,
+    string VehicleType = "motorbike");
 
 public abstract record TripCommand(string ActionName);
 
@@ -67,7 +68,8 @@ public sealed record TripReadModel(
     string MockTokenAlias,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    string PricingMode = "standard");
+    string PricingMode = "standard",
+    string VehicleType = "motorbike");
 
 public sealed record CreateTripResult(
     TripReadModel Trip,
@@ -109,6 +111,7 @@ public static class TripMapper
             ctx.MockTokenAlias,
             ctx.CreatedAt,
             ctx.UpdatedAt,
-            ctx.PricingMode);
+            ctx.PricingMode,
+            ctx.VehicleType);
     }
 }

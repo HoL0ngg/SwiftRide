@@ -12,7 +12,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import type { TripStore } from '../store/tripStore';
-import type { TripStatus } from '../types/tripTypes';
+import { vehicleLabel, type TripStatus } from '../types/tripTypes';
 import { useTripState } from '../store/useTrip';
 import { formatVnd } from '../utils/money';
 import { summarizeEarnings } from '../utils/driverTrips';
@@ -129,6 +129,7 @@ export default function DriverView({ store, online }: Props) {
           </div>
 
           <h2 className="panel-title" style={{ marginTop: 12 }}>{rideHeading}</h2>
+          <p className="caption">{vehicleLabel(rawTrip?.vehicleType)}</p>
 
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8, margin: '16px 0 20px' }}>
             <div>

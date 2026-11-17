@@ -23,6 +23,7 @@ public sealed class TripRecord
     public string? LastPaymentFailure { get; set; }
     public string PaymentTransport { get; set; } = "Rest";
     public string PricingMode { get; set; } = "standard";
+    public string VehicleType { get; set; } = "motorbike";
 
     public string PickupName { get; set; } = string.Empty;
     public string PickupAddress { get; set; } = string.Empty;
@@ -94,7 +95,8 @@ public sealed class TripRecord
             UpdatedAt,
             RowVersion,
             PaymentTransport,
-            PricingMode);
+            PricingMode,
+            VehicleType);
     }
 }
 

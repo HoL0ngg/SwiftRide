@@ -11,7 +11,7 @@ namespace SwiftRide.Api.Tests.FullFlow;
 public class BookingFlowTests
 {
     [LocalFullFlowFact]
-    public async Task Complete_booking_flow_through_gateway_reaches_paid_with_balanced_ledger()
+    public async Task Complete_car_booking_flow_through_gateway_reaches_paid_with_balanced_ledger()
     {
         await using var host = await FullFlowHost.StartAsync();
 
@@ -38,7 +38,8 @@ public class BookingFlowTests
         {
             latitude = 10.7725,
             longitude = 106.6980,
-            isOnline = true
+            isOnline = true,
+            vehicleType = "car"
         });
         Assert.True(driverLocationResponse.StatusCode is HttpStatusCode.NoContent or HttpStatusCode.OK);
 
@@ -51,7 +52,8 @@ public class BookingFlowTests
             DestinationName: "Landmark 81",
             DestinationAddress: "Bình Thạnh",
             PaymentMethod: "wallet",
-            Mode: "standard");
+            Mode: "night",
+            VehicleType: "car");
 
         var createMsg = new HttpRequestMessage(HttpMethod.Post, "/trips")
         {
@@ -64,6 +66,8 @@ public class BookingFlowTests
         var createdTrip = await createResponse.Content.ReadFromJsonAsync<TripResponse>();
         Assert.NotNull(createdTrip);
         Assert.Equal("Quoted", createdTrip.Status);
+        Assert.Equal("car", createdTrip.VehicleType);
+        Assert.Equal("night", createdTrip.PricingMode);
         Assert.NotNull(createdTrip.QuoteId);
         Assert.NotNull(createdTrip.FareAmount);
         Assert.Equal(driverId, createdTrip.CandidateDriverId);
@@ -138,12 +142,14 @@ public class BookingFlowTests
 
         Assert.NotNull(finalizedTrip);
         Assert.Equal("Paid", finalizedTrip.Status);
+        Assert.Equal("car", finalizedTrip.VehicleType);
 
         // 11. Assert database state
         await using (var tripDb = host.CreateTripDbContext())
         {
             var record = await tripDb.Trips.SingleAsync(t => t.Id == tripId);
             Assert.Equal("Paid", record.Status);
+            Assert.Equal("car", record.VehicleType);
             Assert.NotNull(record.PaymentId);
             Assert.Equal(createdTrip.FareAmount, record.FareAmount.ToString());
         }

@@ -29,6 +29,7 @@ public static class TripResponseMapper
             model.PaymentMethod,
             model.CreatedAt,
             model.UpdatedAt,
-            model.PricingMode);
+            model.PricingMode,
+            model.VehicleType);
     }
 }

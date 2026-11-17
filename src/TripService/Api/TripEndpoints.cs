@@ -109,7 +109,8 @@ public static class TripEndpoints
             request.PaymentMethod ?? "card",
             request.Mode ?? "standard",
             request.PaymentTransport,
-            request.DemoPaymentOutcome);
+            request.DemoPaymentOutcome,
+            request.VehicleType);
 
         var result = await useCase.ExecuteAsync(command, ct);
         TripTelemetry.TripsCreated.Add(1);

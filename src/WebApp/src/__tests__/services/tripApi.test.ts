@@ -35,6 +35,38 @@ const mockTrip: TripResponse = {
 };
 
 describe('tripApi', () => {
+  it('sends the selected car independently of night mode and restores both from the server', async () => {
+    const session = createAuthSession({ userId: 'rider-1', role: 'rider' });
+    session.setToken('test-token');
+    const response = { ...mockTrip, vehicleType: 'car', pricingMode: 'night' };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(response), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(response), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const api = createTripApi(session);
+
+    await api.createTrip({ pickup: mockTrip.pickup, destination: mockTrip.destination,
+      paymentMethod: 'wallet', vehicleType: 'car', mode: 'night' });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ vehicleType: 'car', mode: 'night' });
+    const restored = await api.getCurrentTrip();
+    expect(restored?.vehicleType).toBe('car');
+    expect(restored?.pricingMode).toBe('night');
+  });
+
+  it('sends the driver vehicle type in the location request', async () => {
+    const session = createAuthSession({ userId: 'driver-1', role: 'driver' });
+    session.setToken('test-token');
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createTripApi(session).updateDriverLocation('driver-1', 10.77, 106.69, true, 'car');
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      latitude: 10.77, longitude: 106.69, isOnline: true, vehicleType: 'car',
+    });
+  });
+
   it('sends night mode to the gateway and preserves it in the response', async () => {
     const session = createAuthSession({ userId: 'rider-1', role: 'rider' });
     session.setToken('test-token');
@@ -73,6 +105,7 @@ describe('tripApi', () => {
 
     expect(result.id).toBe(mockTrip.id);
     expect(result.status).toBe('Requested');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).vehicleType).toBe('motorbike');
     expect(result.fareAmount).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith(
       '/trips',

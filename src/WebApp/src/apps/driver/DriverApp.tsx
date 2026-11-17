@@ -7,6 +7,7 @@ import BrandMark from '../../components/ui/BrandMark';
 import Avatar from '../../components/ui/Avatar';
 import TripHistoryList from '../../components/ui/TripHistoryList';
 import type { Place } from '../../types/place';
+import type { VehicleType } from '../../types/tripTypes';
 import { createSwiftRideClient } from '../../services/api';
 import { useTrip } from '../../store/useTrip';
 import { useDriverPresence } from '../../store/useDriverPresence';
@@ -24,15 +25,21 @@ function pageFromHash(): Page {
 
 export default function DriverApp() {
   const [page, setPage] = useState<Page>(pageFromHash);
-  const [online, setOnline] = useState(true);
+  const [online, setOnline] = useState(false);
+  const [vehicleType, setVehicleType] = useState<VehicleType>('motorbike');
   const client = useMemo(() => createSwiftRideClient({ userId: DRIVER_ID, role: 'driver' }), []);
   // The only place that starts polling; DriverView just reads the shared state.
   const state = useTrip(client.store);
-  const { position, moveTo } = useDriverPresence(client.api, DRIVER_ID, online);
-
   const trip = state.trip;
   const accepted = isAcceptedByDriver(trip?.status);
+  const vehicleLocked = accepted || trip?.status === 'DriverOffered';
+  const activeVehicleType = vehicleLocked ? trip?.vehicleType ?? vehicleType : vehicleType;
+  const { position, moveTo } = useDriverPresence(client.api, DRIVER_ID, online, activeVehicleType);
   const earnings = summarizeEarnings(state.history);
+
+  useEffect(() => {
+    if (vehicleLocked && trip?.vehicleType) setVehicleType(trip.vehicleType);
+  }, [vehicleLocked, trip?.vehicleType]);
 
   useEffect(() => {
     if (location.search.includes('code=') || location.hash.includes('code=')) {
@@ -98,6 +105,14 @@ export default function DriverApp() {
           </button>
         </nav>
         <div className="topbar-actions">
+          <label>
+            Loại xe{' '}
+            <select aria-label="Loại xe tài xế" value={activeVehicleType} disabled={online || vehicleLocked}
+              onChange={event => setVehicleType(event.target.value as VehicleType)}>
+              <option value="motorbike">Xe 2 bánh</option>
+              <option value="car">Xe 4 bánh</option>
+            </select>
+          </label>
           <span className="pill hide-on-mobile" style={{ background: 'rgb(255 255 255 / 0.14)', color: '#fff' }}>
             Đã nhận {formatVnd(earnings.totalVnd)}
           </span>
@@ -106,7 +121,7 @@ export default function DriverApp() {
             role="switch"
             aria-checked={online}
             aria-label="Trạng thái nhận chuyến"
-            disabled={accepted}
+            disabled={accepted && online}
             className="online-switch"
             onClick={() => setOnline(current => !current)}
           >

@@ -63,4 +63,11 @@ describe('trip history list', () => {
     expect(html).toContain('Không thành công');
     expect(html).toContain('50.000 ₫');
   });
+
+  it('shows the booked vehicle type from history', () => {
+    const items = [{ ...base, id: 'car-trip', status: 'Paid', vehicleType: 'car' }] as TripResponse[];
+    const html = renderToStaticMarkup(<TripHistoryList items={items} emptyTitle="" emptyHint="" />);
+    expect(html).toContain('Xe 4 bánh');
+    expect(html).not.toContain('Xe 2 bánh');
+  });
 });

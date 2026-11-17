@@ -1,3 +1,9 @@
+export type VehicleType = 'motorbike' | 'car';
+
+export function vehicleLabel(vehicleType: VehicleType = 'motorbike'): string {
+  return vehicleType === 'car' ? 'Xe 4 bánh' : 'Xe 2 bánh';
+}
+
 export type TripStatus =
   | 'Requested'
   | 'Quoted'
@@ -25,6 +31,7 @@ export interface CreateTripInput {
   destinationAddress?: string;
   paymentMethod: string;
   mode?: string;
+  vehicleType?: VehicleType;
 }
 
 export interface ConfirmQuoteInput {
@@ -36,6 +43,7 @@ export interface CancelTripInput {
 }
 
 export interface TripResponse {
+  vehicleType?: VehicleType;
   pricingMode?: string;
   id: string;
   riderId: string;

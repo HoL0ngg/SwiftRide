@@ -5,6 +5,7 @@ namespace SwiftRide.MatchingService.Infrastructure.Persistence;
 public sealed class DriverLocationRow
 {
     public string DriverId { get; set; } = "";
+    public string VehicleType { get; set; } = "motorbike";
     public double Latitude { get; set; }
     public double Longitude { get; set; }
     public bool IsOnline { get; set; }
@@ -13,6 +14,7 @@ public sealed class DriverLocationRow
 public sealed class QuoteRow
 {
     public Guid Id { get; set; }
+    public string VehicleType { get; set; } = "motorbike";
     public decimal DistanceKm { get; set; }
     public decimal EstimatedMinutes { get; set; }
     public decimal CostPerKm { get; set; }
@@ -35,6 +37,7 @@ public sealed class MatchingDbContext(DbContextOptions<MatchingDbContext> option
         d.ToTable("driver_locations", "matchdb");
         d.HasKey(x => x.DriverId);
         d.Property(x => x.DriverId).HasColumnName("driver_id");
+        d.Property(x => x.VehicleType).HasColumnName("vehicle_type").HasDefaultValue("motorbike");
         d.Property(x => x.Latitude).HasColumnName("latitude");
         d.Property(x => x.Longitude).HasColumnName("longitude");
         d.Property(x => x.IsOnline).HasColumnName("is_online");
@@ -43,6 +46,7 @@ public sealed class MatchingDbContext(DbContextOptions<MatchingDbContext> option
         q.ToTable("quotes", "matchdb");
         q.HasKey(x => x.Id);
         q.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+        q.Property(x => x.VehicleType).HasColumnName("vehicle_type").HasDefaultValue("motorbike");
         q.Property(x => x.DistanceKm).HasColumnName("distance_km");
         q.Property(x => x.EstimatedMinutes).HasColumnName("estimated_minutes");
         q.Property(x => x.CostPerKm).HasColumnName("cost_per_km");

@@ -11,4 +11,5 @@ public sealed record QuoteRequestedV1(
     string Mode,
     DateTimeOffset OccurredAtUtc,
     string CorrelationId,
-    Guid? CausationId = null);
+    Guid? CausationId = null,
+    string VehicleType = "motorbike");

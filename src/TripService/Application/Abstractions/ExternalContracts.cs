@@ -2,7 +2,7 @@ namespace SwiftRide.TripService.Application.Abstractions;
 
 public sealed record GeoCoordinate(double Latitude, double Longitude);
 
-public sealed record MatchInput(GeoCoordinate Pickup, IReadOnlyList<string> ExcludedDriverIds);
+public sealed record MatchInput(GeoCoordinate Pickup, IReadOnlyList<string> ExcludedDriverIds, string VehicleType = "motorbike");
 
 public enum MatchStatus
 {
@@ -14,7 +14,7 @@ public sealed record CandidateDriver(string DriverId, double DistanceKm);
 
 public sealed record MatchOutcome(MatchStatus Status, CandidateDriver? Candidate);
 
-public sealed record QuoteInput(GeoCoordinate Pickup, GeoCoordinate Destination, string Mode = "standard");
+public sealed record QuoteInput(GeoCoordinate Pickup, GeoCoordinate Destination, string Mode = "standard", string VehicleType = "motorbike");
 
 public sealed record QuotedFare(
     Guid QuoteId,

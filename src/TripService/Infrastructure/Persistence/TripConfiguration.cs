@@ -30,6 +30,7 @@ public sealed class TripRecordConfiguration : IEntityTypeConfiguration<TripRecor
         builder.Property(t => t.LastPaymentFailure).HasMaxLength(50);
         builder.Property(t => t.PaymentTransport).HasMaxLength(20).HasDefaultValue("Rest");
         builder.Property(t => t.PricingMode).HasMaxLength(50).HasDefaultValue("standard");
+        builder.Property(t => t.VehicleType).HasMaxLength(20).HasDefaultValue("motorbike");
 
         builder.Property(t => t.RowVersion).IsRowVersion();
 

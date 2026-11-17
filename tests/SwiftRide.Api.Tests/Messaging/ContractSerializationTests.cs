@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using SwiftRide.Contracts.V1;
 using Xunit;
 
@@ -6,6 +7,34 @@ namespace SwiftRide.Api.Tests.Messaging;
 
 public class ContractSerializationTests
 {
+    [Theory]
+    [InlineData(null, "motorbike")]
+    [InlineData("car", "car")]
+    public void Matching_requests_preserve_vehicle_type_and_default_legacy_messages(string? vehicleType, string expected)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var quote = new QuoteRequestedV1(Guid.NewGuid(), Guid.NewGuid(), 10, 106, 11, 107,
+            "night", now, "vehicle-test");
+        var match = new DriverMatchRequestedV1(Guid.NewGuid(), quote.TripId, 10, 106,
+            ["excluded-driver"], now, "vehicle-test");
+
+        var quoteJson = JsonSerializer.SerializeToNode(quote, JsonOptions)!.AsObject();
+        var matchJson = JsonSerializer.SerializeToNode(match, JsonOptions)!.AsObject();
+        if (vehicleType is null)
+        {
+            quoteJson.Remove("vehicleType");
+            matchJson.Remove("vehicleType");
+        }
+        else
+        {
+            quoteJson["vehicleType"] = vehicleType;
+            matchJson["vehicleType"] = vehicleType;
+        }
+
+        Assert.Equal(expected, quoteJson.Deserialize<QuoteRequestedV1>(JsonOptions)!.VehicleType);
+        Assert.Equal(expected, matchJson.Deserialize<DriverMatchRequestedV1>(JsonOptions)!.VehicleType);
+    }
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

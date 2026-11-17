@@ -12,7 +12,8 @@ public sealed record CreateTripRequest(
     string PaymentMethod,
     string? Mode = "standard",
     string? PaymentTransport = null,
-    string? DemoPaymentOutcome = null);
+    string? DemoPaymentOutcome = null,
+    string VehicleType = "motorbike");
 
 public sealed record ConfirmQuoteRequest(Guid QuoteId);
 
@@ -43,7 +44,8 @@ public sealed record TripResponse(
     string PaymentMethod,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    string PricingMode = "standard");
+    string PricingMode = "standard",
+    string VehicleType = "motorbike");
 
 public sealed record DriverFeedApiResponse(TripResponse? OfferedTrip, TripResponse? ActiveTrip);
 

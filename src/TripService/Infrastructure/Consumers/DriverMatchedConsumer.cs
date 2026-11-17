@@ -159,7 +159,8 @@ public sealed class DriverMatchedConsumer(
             ExcludedDriverIds: excluded,
             OccurredAtUtc: now,
             CorrelationId: message.CorrelationId,
-            CausationId: message.EventId));
+            CausationId: message.EventId,
+            VehicleType: ctx.VehicleType));
         await CompleteAsync(message, "DriverBusy", ct);
         logger.LogInformation("[PROCESSED] {EventType} EventId={EventId} TripId={TripId}", nameof(DriverMatchedV1), message.EventId, message.TripId);
     }

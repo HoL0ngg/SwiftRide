@@ -267,7 +267,8 @@ public sealed class TripCommandUseCase(
             PickupLongitude: ctx.PickupLon,
             ExcludedDriverIds: trip.RejectedDriverIds.Take(100).ToArray(),
             OccurredAtUtc: now,
-            CorrelationId: $"trip-{trip.Id:D}-match-{trip.RejectionCount}"));
+            CorrelationId: $"trip-{trip.Id:D}-match-{trip.RejectionCount}",
+            VehicleType: ctx.VehicleType));
     }
 
     private async Task<TripCommandOutcome> MatchAndOfferDriverAsync(
@@ -289,7 +290,7 @@ public sealed class TripCommandUseCase(
         {
             attempts++;
             var matchResult = await matchingClient.MatchAsync(
-                new MatchInput(pickup, excludedDrivers.Take(100).ToArray()), ct);
+                new MatchInput(pickup, excludedDrivers.Take(100).ToArray(), ctx.VehicleType), ct);
 
             if (matchResult.Status != MatchStatus.Matched || matchResult.Candidate is null)
             {

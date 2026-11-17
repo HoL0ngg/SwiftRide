@@ -92,7 +92,8 @@ public sealed class CreateTripUseCase(
             now,
             rowVersion: null,
             paymentTransport: effectiveTransport,
-            pricingMode: cmd.Mode?.Trim() ?? "standard");
+            pricingMode: cmd.Mode?.Trim() ?? "standard",
+            vehicleType: cmd.VehicleType.Trim().ToLowerInvariant());
 
         writer.Add(context);
         assignmentStore.ClaimRider(cmd.Actor.Id, trip.Id);
@@ -124,7 +125,8 @@ public sealed class CreateTripUseCase(
                 DestinationLongitude: cmd.Destination.Longitude,
                 Mode: context.PricingMode,
                 OccurredAtUtc: now,
-                CorrelationId: $"trip-{trip.Id:D}-quote"));
+                CorrelationId: $"trip-{trip.Id:D}-quote",
+                VehicleType: context.VehicleType));
 
             await unitOfWork.SaveAsync(ct);
             return new CreateTripResult(TripMapper.ToReadModel(context), IsReplay: false, IsPendingWork: true);
@@ -162,6 +164,11 @@ public sealed class CreateTripUseCase(
         if (cmd.DemoPaymentOutcome is "declined" or "timeout")
             sb.Append("demo:").Append(cmd.DemoPaymentOutcome).Append(';');
 
+        // The default preserves existing motorbike fingerprints after deployment.
+        var vehicleType = cmd.VehicleType.Trim().ToLowerInvariant();
+        if (vehicleType != "motorbike")
+            sb.Append("vehicle:").Append(vehicleType).Append(';');
+
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString())));
     }
 
@@ -192,6 +199,9 @@ public sealed class CreateTripUseCase(
 
         if (cmd.DemoPaymentOutcome is not (null or "success" or "declined" or "timeout"))
             throw new InvalidTripCommandException("Demo payment outcome must be 'success', 'declined' or 'timeout'.");
+
+        if (cmd.VehicleType?.Trim().ToLowerInvariant() is not ("motorbike" or "car"))
+            throw new InvalidTripCommandException("Vehicle type must be 'motorbike' or 'car'.");
 
         var mode = cmd.Mode?.Trim() ?? "standard";
         if (!_lifecycleOptions.SupportedPricingModes.Contains(mode, StringComparer.OrdinalIgnoreCase))

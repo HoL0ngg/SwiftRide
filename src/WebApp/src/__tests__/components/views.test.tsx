@@ -101,6 +101,19 @@ describe('rider booking and trip controls', () => {
     expect(text(html)).toContain('Ví SwiftPay');
     expect(text(html)).toContain('Thẻ thanh toán');
     expect(buttons(html)).toContain('Giả lập ban đêm');
+    expect(buttons(html)).toContain('Xe 2 bánh');
+    expect(buttons(html)).toContain('Xe 4 bánh');
+  });
+
+  it('shows the server vehicle type on a restored trip', () => {
+    const trip = { ...mockTrip('Quoted'), vehicleType: 'car' as const };
+    const html = renderToStaticMarkup(
+      <RiderView pickup={testPlaces[0]} destination={testPlaces[1]} selection={null}
+        onChange={() => {}} onSelectMap={() => {}} onSwap={() => {}}
+        store={createMockStore(trip)} session={mockSession} />
+    );
+    expect(text(html)).toContain('Xe 4 bánh');
+    expect(text(html)).not.toContain('Xe 2 bánh');
   });
 
   it('shows the selected night simulation before requesting a quote', () => {

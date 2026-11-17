@@ -2,12 +2,12 @@ using SwiftRide.MatchingService.Domain;
 
 namespace SwiftRide.MatchingService.Application;
 
-public sealed record DriverLocation(string DriverId, GeoPoint Position, bool IsOnline, DateTimeOffset UpdatedAt);
-public sealed record QuoteSnapshot(Guid Id, PricingContext Pricing, decimal Amount, string Currency, DateTimeOffset CreatedAt);
+public sealed record DriverLocation(string DriverId, GeoPoint Position, bool IsOnline, DateTimeOffset UpdatedAt, string VehicleType = "motorbike");
+public sealed record QuoteSnapshot(Guid Id, PricingContext Pricing, decimal Amount, string Currency, DateTimeOffset CreatedAt, string VehicleType = "motorbike");
 public sealed record DriverCandidate(string DriverId, double DistanceKm);
 public sealed record MatchResult(string Status, DriverCandidate? Candidate);
 public sealed record QuoteResult(Guid QuoteId, decimal Amount, string Currency, decimal DistanceKm,
-    decimal EstimatedMinutes, PricingContext Breakdown, DateTimeOffset CreatedAt);
+    decimal EstimatedMinutes, PricingContext Breakdown, DateTimeOffset CreatedAt, string VehicleType = "motorbike");
 
 public interface IDriverLocationReader
 {
