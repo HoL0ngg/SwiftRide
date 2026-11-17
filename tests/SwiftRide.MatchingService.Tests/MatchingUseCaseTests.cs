@@ -6,6 +6,37 @@ namespace SwiftRide.MatchingService.Tests;
 
 public class MatchingUseCaseTests
 {
+    [Theory]
+    [InlineData(1, 1.2)]
+    [InlineData(1.3, 1.56)]
+    public async Task Night_quote_applies_configured_rates_and_preserves_surge(decimal surge, decimal effectiveMultiplier)
+    {
+        var writer = new Mock<IQuoteWriter>();
+        QuoteSnapshot? saved = null;
+        writer.Setup(w => w.AddAsync(It.IsAny<QuoteSnapshot>(), It.IsAny<CancellationToken>()))
+            .Callback<QuoteSnapshot, CancellationToken>((q, _) => saved = q).Returns(Task.CompletedTask);
+        var options = new MatchingOptions { Surge = surge };
+        var useCase = new CreateQuote(writer.Object,
+            [new StandardPricingStrategy(), new NightPricingStrategy(1.2m)], options, new Clock());
+
+        var result = await useCase.ExecuteAsync(new(0, 0), new(0, 1), "night", default);
+
+        Assert.NotNull(saved);
+        Assert.Equal(options.CostPerKm * 1.2m, saved.Pricing.CostPerKm);
+        Assert.Equal(options.CostPerMinute * 1.2m, saved.Pricing.CostPerMinute);
+        Assert.Equal(surge, saved.Pricing.Surge);
+        var baseFare = options.CostPerKm * result.DistanceKm + options.CostPerMinute * result.EstimatedMinutes;
+        Assert.Equal(decimal.Round(baseFare * effectiveMultiplier, 0, options.Rounding), result.Amount);
+        Assert.Equal(result.Amount, new FareCalculator(new StandardPricingStrategy()).Calculate(saved.Pricing, options.Rounding));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(0.9)]
+    public void Night_strategy_rejects_invalid_multiplier(decimal multiplier) =>
+        Assert.Throws<MatchingDomainException>(() => new NightPricingStrategy(multiplier));
+
     private sealed class Clock : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => DateTimeOffset.Parse("2026-10-28T00:00:00Z");

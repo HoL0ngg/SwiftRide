@@ -42,7 +42,8 @@ public sealed record TripResponse(
     GeoPointResponse Destination,
     string PaymentMethod,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string PricingMode = "standard");
 
 public sealed record DriverFeedApiResponse(TripResponse? OfferedTrip, TripResponse? ActiveTrip);
 

@@ -53,3 +53,21 @@
   --color-brand-600: #1e3a8a;
   --color-brand-700: #172e6e;
 }
+
+.app-frame[data-night='true'] {
+  color-scheme: dark;
+  color: var(--color-ink-900);
+  --color-surface: #17243b;
+  --color-canvas: #0c1628;
+  --color-line: #344762;
+  --color-ink-900: #edf4ff;
+  --color-ink-700: #ccdbee;
+  --color-ink-500: #afc2dc;
+  --color-brand-50: #1b2e49;
+  --color-brand-100: #253e60;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #93bbf9;
+  --color-danger-soft: #441f2c;
+  --color-warning-soft: #42361f;
+  --color-success-soft: #163c30;
+}

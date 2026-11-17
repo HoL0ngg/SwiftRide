@@ -10,14 +10,14 @@ public sealed class CreateQuote(IQuoteWriter writer, IEnumerable<IPricingStrateg
     /// </param>
     public async Task<QuoteResult> ExecuteAsync(GeoPoint pickup, GeoPoint destination, string mode, CancellationToken cancellationToken, Guid? quoteId = null)
     {
-        var strategy = strategies.FirstOrDefault(s => s.Mode == mode)
+        var strategy = strategies.FirstOrDefault(s => string.Equals(s.Mode, mode.Trim(), StringComparison.OrdinalIgnoreCase))
             ?? throw new MatchingDomainException("Unsupported pricing mode.");
         var distance = (decimal)pickup.DistanceKmTo(destination);
         decimal minutes;
         try { minutes = distance / options.AverageSpeedKph * 60; }
         catch (OverflowException) { throw new MatchingDomainException("Estimated duration exceeds the supported range."); }
-        var context = new PricingContext(distance, minutes, options.CostPerKm, options.CostPerMinute,
-            options.Surge, options.Toll, options.PromotionFactor, options.Tax);
+        var context = strategy.PrepareContext(new PricingContext(distance, minutes, options.CostPerKm, options.CostPerMinute,
+            options.Surge, options.Toll, options.PromotionFactor, options.Tax));
         var amount = new FareCalculator(strategy).Calculate(context, options.Rounding);
         var quote = new QuoteSnapshot(quoteId ?? Guid.NewGuid(), context, amount, "VND", clock.GetUtcNow());
         await writer.AddAsync(quote, cancellationToken);

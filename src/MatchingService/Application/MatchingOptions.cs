@@ -10,6 +10,7 @@ public sealed class MatchingOptions
     public decimal CostPerKm { get; set; } = 7500;
     public decimal CostPerMinute { get; set; } = 300;
     public decimal Surge { get; set; } = 1;
+    public decimal NightMultiplier { get; set; } = 1.2m;
     public decimal Toll { get; set; }
     public decimal PromotionFactor { get; set; } = 1;
     public decimal Tax { get; set; }
@@ -17,7 +18,7 @@ public sealed class MatchingOptions
 
     public void Validate()
     {
-        if (!double.IsFinite(RadiusKm) || RadiusKm <= 0 || LocationMaxAgeSeconds <= 0 || AverageSpeedKph <= 0 || !Enum.IsDefined(Rounding))
+        if (!double.IsFinite(RadiusKm) || RadiusKm <= 0 || LocationMaxAgeSeconds <= 0 || AverageSpeedKph <= 0 || NightMultiplier < 1 || !Enum.IsDefined(Rounding))
             throw new MatchingDomainException("Matching configuration is invalid.");
         new PricingContext(0, 0, CostPerKm, CostPerMinute, Surge, Toll, PromotionFactor, Tax).Validate();
     }

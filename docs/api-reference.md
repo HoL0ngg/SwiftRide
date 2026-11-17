@@ -74,7 +74,7 @@ Idempotency-Key: <unique-create-key>
 | `pickup`, `destination` | object | Bắt buộc, chứa latitude/longitude dạng number; latitude −90..90, longitude −180..180; hai điểm không được trùng nhau |
 | `pickupName`, `pickupAddress`, `destinationName`, `destinationAddress` | string / null | Tùy chọn; thiếu/null được lưu thành chuỗi rỗng |
 | `paymentMethod` | string | `card` hoặc `wallet`; thiếu/null được endpoint mặc định `card`; nên gửi rõ giá trị |
-| `mode` | string | Tùy chọn, mặc định `standard`; phải nằm trong các mode server hỗ trợ |
+| `mode` | string | Tùy chọn, mặc định `standard`; hỗ trợ `standard`, `night` theo cấu hình server |
 | `paymentTransport` | string / null | Tùy chọn kỹ thuật cho demo: `Rest` hoặc `Events`; thường bỏ để dùng cấu hình server. Gửi `Events` khi messaging tắt trả `400` |
 | `demoPaymentOutcome` | string / null | Chỉ Development: `success`, `declined`, `timeout`; bỏ trường này dùng mock thành công. Ngoài Development trả `400` nếu gửi trường này. Xem [demo Postman](postman-demo.md) |
 
@@ -116,6 +116,9 @@ Ví dụ minh họa hình dạng dữ liệu, UUID/giá/thời gian không phả
 ```
 
 `quoteId`, `fareAmount`, `currency`, `distanceKm`, `estimatedMinutes` có thể null trước khi báo giá. Các ID driver có thể null tùy giai đoạn. Timestamps là ISO 8601 có offset. `status` là chuỗi tên trạng thái.
+
+`TripResponse` còn có `pricingMode` (`standard` hoặc `night`), lấy từ snapshot mode
+đã lưu trong Trip, để client hiển thị đúng chế độ sau khi tải lại trang.
 
 Luồng chính: `Requested → Quoted → DriverOffered → DriverAccepted → EnRoute → PickedUp → DroppedOff → PaymentPending → Paid`. Endpoint dropoff thực hiện cả bước yêu cầu thanh toán, nên không nhất thiết quan sát được `DroppedOff` qua HTTP. `Paid`, `Cancelled`, `Failed` là terminal; `PaymentPending` chưa kết thúc. Không coi `200` của dropoff là thanh toán thành công: đọc `status` và polling nếu cần. Khi thanh toán hết retry vẫn lỗi, chuyến giữ `PaymentPending`.
 

@@ -63,6 +63,14 @@ Khi dùng `VITE_AUTH_MODE=oidc`, `VITE_OIDC_REDIRECT_URI` phải trỏ về tran
 
 ## 3. Kịch bản trải nghiệm hai tab với backend thật
 
+**Giả lập ban đêm:** tại form Rider, bật **Giả lập ban đêm** trước khi nhấn
+**Xem giá chuyến đi**. Thẻ và bản đồ chuyển tối; request gửi mode `night`, backend
+tính giá với `Matching:NightMultiplier` (mặc định 1,2). Tắt nút để trở về `standard`.
+Không đổi mode khi đã có chuyến; dùng **Chọn lại hành trình** hoặc **Đặt một chuyến
+mới** để lấy báo giá khác. Giao diện phục hồi màu theo `pricingMode` từ backend khi
+tải lại trang. Đây là giả lập phục vụ môn học, không lấy giờ hoặc thời tiết thực tế.
+
+
 1. **Tab Tài xế (`/driver/`):**
    - Bật công tắc "Trực tuyến" trên thanh trên cùng.
    - Bấm lên bản đồ để đặt vị trí gần điểm đón (ví dụ khu vực Chợ Bến Thành). Ứng dụng gửi tọa độ tới Gateway.

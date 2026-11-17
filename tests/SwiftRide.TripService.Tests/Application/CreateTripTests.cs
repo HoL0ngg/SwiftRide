@@ -14,6 +14,22 @@ namespace SwiftRide.TripService.Tests.Application;
 public class CreateTripTests
 {
     [Fact]
+    public async Task Create_NightMode_UsesMatchingAndReturnsPersistedMode()
+    {
+        var sut = CreateSut();
+        _matchingClient.Setup(m => m.MatchAsync(It.IsAny<MatchInput>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MatchOutcome(MatchStatus.Matched, new CandidateDriver("drv-1", 1.5)));
+        _matchingClient.Setup(m => m.QuoteAsync(It.Is<QuoteInput>(q => q.Mode == "night"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new QuotedFare(Guid.NewGuid(), 60000m, "VND", 5m, 15m, DateTimeOffset.UtcNow));
+
+        var result = await sut.ExecuteAsync(ValidCommand() with { Mode = "night" }, CancellationToken.None);
+
+        Assert.Equal("night", result.Trip.PricingMode);
+        Assert.Equal("60000", result.Trip.FareAmount);
+        _writer.Verify(w => w.Add(It.Is<TripContext>(c => c.PricingMode == "night")), Times.Once);
+    }
+
+    [Fact]
     public void DemoPaymentOutcome_FingerprintPreservesSuccessAndDistinguishesFailures()
     {
         var command = ValidCommand();

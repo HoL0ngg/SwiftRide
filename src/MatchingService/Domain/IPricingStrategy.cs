@@ -3,6 +3,7 @@ namespace SwiftRide.MatchingService.Domain;
 public interface IPricingStrategy
 {
     string Mode { get; }
+    PricingContext PrepareContext(PricingContext context) => context;
     decimal CalculateBase(PricingContext context);
 }
 

@@ -20,6 +20,7 @@ public static class MatchingApplication
         builder.Services.AddSingleton(options);
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IPricingStrategy, StandardPricingStrategy>();
+        builder.Services.AddSingleton<IPricingStrategy>(new NightPricingStrategy(options.NightMultiplier));
         builder.Services.AddScoped<UpdateDriverLocation>();
         builder.Services.AddScoped<MatchDriver>();
         builder.Services.AddScoped<CreateQuote>();

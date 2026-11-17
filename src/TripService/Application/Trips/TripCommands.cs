@@ -66,7 +66,8 @@ public sealed record TripReadModel(
     string PaymentMethod,
     string MockTokenAlias,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string PricingMode = "standard");
 
 public sealed record CreateTripResult(
     TripReadModel Trip,
@@ -107,6 +108,7 @@ public static class TripMapper
             ctx.PaymentMethod,
             ctx.MockTokenAlias,
             ctx.CreatedAt,
-            ctx.UpdatedAt);
+            ctx.UpdatedAt,
+            ctx.PricingMode);
     }
 }

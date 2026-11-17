@@ -6,6 +6,34 @@ interface persistence/geocoding), Infrastructure (EF Core/Npgsql và Nominatim),
 
 ## API hiện có
 
+### Giả lập giá ban đêm
+
+`mode` hỗ trợ `standard` và `night`. Giao diện Rider có nút **Giả lập ban đêm** trước
+khi tạo chuyến; nút đổi giao diện tối và gửi `mode: "night"` qua Gateway. Đây là lựa
+chọn kịch bản demo, không tự xác định giờ thực tế. Sau khi có chuyến, giao diện dùng
+`pricingMode` do Trip trả về, kể cả khi tải lại trang; muốn đổi mode phải chọn lại
+hành trình và lấy báo giá mới.
+
+`NightPricingStrategy` triển khai `IPricingStrategy`. `CreateQuote` chọn strategy,
+gọi `PrepareContext` một lần để lấy đơn giá hiệu lực rồi gọi `FareCalculator`.
+Strategy thường giữ nguyên context; strategy ban đêm nhân đơn giá km và phút với
+`Matching:NightMultiplier` (mặc định `1.2`, phải ≥ 1). Sau đó dùng lại phép tính base
+hiện tại, không sửa `StandardPricingStrategy`. Snapshot lưu đơn giá đã điều chỉnh,
+nên công thức từ snapshot vẫn tái tạo đúng giá. Không cần migration.
+
+Thứ tự: đơn giá ban đêm → base → surge → toll → promotion → tax → làm tròn một lần.
+Ví dụ base thường 50.000đ, ban đêm ×1,2 thành 60.000đ khi các bước còn lại trung tính.
+Hệ số này là ví dụ môn học, không phải biểu giá thực tế. Đổi cấu hình bằng
+`Matching__NightMultiplier`; thay đổi chỉ tác động báo giá mới. Trip đã chốt giá và
+Payment tiếp tục sử dụng fare snapshot.
+
+Trời mưa chưa có nút giả lập hay dữ liệu thời tiết trong bản này. Khi bổ sung, có
+thể dùng hệ số mưa ở bước surge, độc lập với mode ban đêm: ×1,2 (đêm) ×1,3 (mưa)
+= ×1,56 trên phần base. `Matching:Surge` hiện là cấu hình chung, không phải cờ mưa
+theo từng chuyến. Nếu cần bật mưa cho từng yêu cầu, phải truyền điều kiện qua cả
+REST/event và lưu để phục hồi; không tạo các mode tổ hợp như `night-rain`.
+
+
 | Endpoint | Quyền | Đầu vào | Kết quả |
 |---|---|---|---|
 | `PUT /drivers/{id}/location` | Gateway + JWT driver, `sub == id` | `latitude`, `longitude`, `isOnline` | `204`, upsert và timestamp server |

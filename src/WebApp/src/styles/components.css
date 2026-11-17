@@ -981,6 +981,27 @@
   filter: saturate(0.55) brightness(1.04) contrast(0.95);
 }
 
+.app-frame[data-night='true'] .ride-map .leaflet-tile-pane {
+  filter: brightness(0.45) saturate(0.5);
+}
+
+.app-frame[data-night='true'] :is(.text-input, .chip-btn, .option, .result-item, .history-item, .place-card--selecting, .step-dot, .service-icon) {
+  background: var(--color-surface);
+}
+
+.app-frame[data-night='true'] :is(.option, .chip-btn)[aria-pressed='true'] {
+  background: var(--color-brand-100);
+}
+
+.app-frame[data-night='true'] :is(.pill-info, .step-label--active) {
+  color: var(--color-brand-300);
+}
+
+.app-frame[data-night='true'] :is(.option, .tab, .chip-btn)[aria-pressed='true'],
+.app-frame[data-night='true'] .tab[aria-current='page'] {
+  color: var(--color-ink-900);
+}
+
 .ride-map .leaflet-top.leaflet-left {
   left: auto;
   right: 16px;

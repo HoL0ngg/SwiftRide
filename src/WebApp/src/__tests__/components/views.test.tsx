@@ -100,6 +100,17 @@ describe('rider booking and trip controls', () => {
     expect(buttons(html)).not.toContain('Xác nhận giá &amp; đặt xe');
     expect(text(html)).toContain('Ví SwiftPay');
     expect(text(html)).toContain('Thẻ thanh toán');
+    expect(buttons(html)).toContain('Giả lập ban đêm');
+  });
+
+  it('shows the selected night simulation before requesting a quote', () => {
+    const html = renderToStaticMarkup(
+      <RiderView pickup={testPlaces[0]} destination={testPlaces[1]} selection={null}
+        onChange={() => {}} onSelectMap={() => {}} onSwap={() => {}}
+        store={createMockStore()} session={mockSession} nightMode onNightModeChange={() => {}} />
+    );
+    expect(html).toMatch(/aria-pressed="true"[^>]*>[\s\S]*?Giả lập ban đêm/);
+    expect(text(html)).toContain('Giá ban đêm do máy chủ tính');
   });
 
   it('offers price confirmation and rejection on a quote', () => {

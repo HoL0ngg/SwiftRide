@@ -36,6 +36,7 @@ function pageFromHash(): Page {
 
 export default function RiderApp() {
   const [page, setPage] = useState<Page>(pageFromHash);
+  const [nightMode, setNightMode] = useState(false);
   const client = useMemo(() => createSwiftRideClient({ userId: RIDER_ID, role: 'rider' }), []);
   // The only place that starts polling; RiderView just reads the shared state.
   const state = useTrip(client.store);
@@ -67,6 +68,7 @@ export default function RiderApp() {
   }
 
   const trip = state.trip;
+  const isNight = trip ? trip.pricingMode === 'night' : nightMode;
   const activeTripMap = trip
     ? {
         pickup: {
@@ -87,7 +89,7 @@ export default function RiderApp() {
     : null;
 
   return (
-    <div className="app-frame">
+    <div className="app-frame" data-night={isNight ? 'true' : undefined}>
       <a className="skip-link" href="#main-content">Đến nội dung chính</a>
       <header className="topbar">
         <BrandMark />
@@ -136,6 +138,8 @@ export default function RiderApp() {
                 }}
                 store={client.store}
                 session={client.session}
+                nightMode={isNight}
+                onNightModeChange={setNightMode}
               />
             </div>
           </section>

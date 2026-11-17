@@ -32,6 +32,7 @@ public class MatchingConsumerTests
             .AddSingleton<TimeProvider>(new Clock())
             .AddSingleton(new MatchingOptions())
             .AddSingleton<IPricingStrategy, StandardPricingStrategy>()
+            .AddSingleton<IPricingStrategy>(new NightPricingStrategy(1.2m))
             .AddSingleton(reader.Object)
             .AddSingleton(quoteWriter.Object)
             .AddScoped<MatchDriver>()
@@ -103,8 +104,10 @@ public class MatchingConsumerTests
         Assert.Contains("[MESSAGE CONTEXT]", published);
     }
 
-    [Fact]
-    public async Task QuoteRequested_WithDriverAvailable_PublishesQuoteReady_AndStoresQuoteUnderRequestId()
+    [Theory]
+    [InlineData("standard", 7500)]
+    [InlineData("night", 9000)]
+    public async Task QuoteRequested_WithDriverAvailable_PublishesQuoteReady_AndStoresQuoteUnderRequestId(string mode, decimal costPerKm)
     {
         var writer = new Mock<IQuoteWriter>();
         QuoteSnapshot? saved = null;
@@ -114,7 +117,7 @@ public class MatchingConsumerTests
         var harness = provider.GetRequiredService<ITestHarness>();
         await harness.Start();
 
-        var request = QuoteRequest();
+        var request = QuoteRequest(mode: mode);
         await harness.Bus.Publish(request);
 
         Assert.True(await harness.Consumed.Any<QuoteRequestedV1>());
@@ -128,6 +131,7 @@ public class MatchingConsumerTests
         // Idempotency: the quote id is derived from the request, so a redelivery maps to the same quote.
         Assert.Equal(request.EventId, reply.QuoteId);
         Assert.Equal(request.EventId, saved!.Id);
+        Assert.Equal(costPerKm, saved.Pricing.CostPerKm);
         Assert.False(await harness.Published.Any<QuoteFailedV1>());
     }
 

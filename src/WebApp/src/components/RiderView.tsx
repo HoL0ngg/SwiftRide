@@ -8,6 +8,7 @@ import {
   Clock3,
   CreditCard,
   LoaderCircle,
+  Moon,
   Navigation,
   ShieldCheck,
   Sparkles,
@@ -101,6 +102,8 @@ type Props = {
   onSwap: () => void;
   store: TripStore;
   session: AuthSession;
+  nightMode?: boolean;
+  onNightModeChange?: (enabled: boolean) => void;
 };
 
 export default function RiderView({
@@ -112,6 +115,8 @@ export default function RiderView({
   onSwap,
   store,
   session,
+  nightMode = false,
+  onNightModeChange,
 }: Props) {
   const backendState = useTripState(store);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'card'>('wallet');
@@ -172,6 +177,9 @@ export default function RiderView({
 
   return (
     <section aria-label="Đặt chuyến cho hành khách">
+      {rawTrip?.pricingMode === 'night' && (
+        <p className="caption" style={{ marginBottom: 12 }}><Moon size={14} aria-hidden="true" /> Giá ban đêm · Giả lập</p>
+      )}
       {!trip ? (
         <>
           <span className="eyebrow">Hành khách</span>
@@ -193,7 +201,7 @@ export default function RiderView({
                   destinationName: destination.name,
                   destinationAddress: destination.address,
                   paymentMethod,
-                  mode: 'standard',
+                  mode: nightMode ? 'night' : 'standard',
                 })
               );
             }}
@@ -230,6 +238,15 @@ export default function RiderView({
               />
             </div>
 
+            <hr className="divider" />
+            <button type="button" className="option" aria-pressed={nightMode}
+              disabled={loading} onClick={() => onNightModeChange?.(!nightMode)}>
+              <Moon size={18} aria-hidden="true" />
+              Giả lập ban đêm
+            </button>
+            <p className="caption" style={{ marginTop: 8 }}>
+              {nightMode ? 'Giá ban đêm do máy chủ tính. Chỉ áp dụng cho báo giá mới.' : 'Đang dùng giá bình thường. Bật để thử giá ban đêm.'}
+            </p>
             <hr className="divider" />
             <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Thanh toán</h3>
             <div className="option-grid" role="group" aria-label="Phương thức thanh toán">

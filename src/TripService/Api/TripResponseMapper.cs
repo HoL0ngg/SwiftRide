@@ -28,6 +28,7 @@ public static class TripResponseMapper
             new GeoPointResponse(model.DestinationLatitude, model.DestinationLongitude),
             model.PaymentMethod,
             model.CreatedAt,
-            model.UpdatedAt);
+            model.UpdatedAt,
+            model.PricingMode);
     }
 }

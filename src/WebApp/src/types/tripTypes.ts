@@ -36,6 +36,7 @@ export interface CancelTripInput {
 }
 
 export interface TripResponse {
+  pricingMode?: string;
   id: string;
   riderId: string;
   status: TripStatus;

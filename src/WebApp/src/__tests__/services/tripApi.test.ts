@@ -35,6 +35,18 @@ const mockTrip: TripResponse = {
 };
 
 describe('tripApi', () => {
+  it('sends night mode to the gateway and preserves it in the response', async () => {
+    const session = createAuthSession({ userId: 'rider-1', role: 'rider' });
+    session.setToken('test-token');
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...mockTrip, pricingMode: 'night' }), { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await createTripApi(session).createTrip({
+      pickup: mockTrip.pickup, destination: mockTrip.destination, paymentMethod: 'wallet', mode: 'night',
+    });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).mode).toBe('night');
+    expect(result.pricingMode).toBe('night');
+  });
+
   it('creates trip with idempotency key and auth header, preserving null fare in Requested', async () => {
     const session = createAuthSession({ userId: 'rider-1', role: 'rider' });
     session.setToken('test-token');
