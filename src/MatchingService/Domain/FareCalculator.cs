@@ -1,30 +1,18 @@
 namespace SwiftRide.MatchingService.Domain;
 
-public interface IFareStep
+public sealed class FareCalculator
 {
-    decimal Apply(decimal amount, PricingContext context);
-}
+    private readonly IFareComponent _fare;
 
-public sealed class SurgeStep : IFareStep
-{
-    public decimal Apply(decimal amount, PricingContext context) => amount * context.Surge;
-}
-public sealed class TollStep : IFareStep
-{
-    public decimal Apply(decimal amount, PricingContext context) => amount + context.Toll;
-}
-public sealed class PromotionStep : IFareStep
-{
-    public decimal Apply(decimal amount, PricingContext context) => amount * context.PromotionFactor;
-}
-public sealed class TaxStep : IFareStep
-{
-    public decimal Apply(decimal amount, PricingContext context) => amount * (1 + context.Tax);
-}
-
-public sealed class FareCalculator(IPricingStrategy strategy)
-{
-    private static readonly IFareStep[] Steps = [new SurgeStep(), new TollStep(), new PromotionStep(), new TaxStep()];
+    public FareCalculator(IPricingStrategy strategy)
+    {
+        // Wrapping order preserves the pricing formula; round only after the full chain.
+        IFareComponent fare = new BaseFare(strategy);
+        fare = new SurgeDecorator(fare);
+        fare = new TollDecorator(fare);
+        fare = new PromotionDecorator(fare);
+        _fare = new TaxDecorator(fare);
+    }
 
     public decimal Calculate(PricingContext context, MidpointRounding rounding)
     {
@@ -32,9 +20,7 @@ public sealed class FareCalculator(IPricingStrategy strategy)
         if (!Enum.IsDefined(rounding)) throw new MatchingDomainException("Invalid rounding policy.");
         try
         {
-            var amount = strategy.CalculateBase(context);
-            if (amount < 0) throw new MatchingDomainException("A pricing strategy cannot return a negative fare.");
-            foreach (var step in Steps) amount = step.Apply(amount, context);
+            var amount = _fare.Calculate(context);
             amount = decimal.Round(amount, 0, rounding);
             if (amount < 0 || amount >= 1_000_000_000_000_000_000m)
                 throw new MatchingDomainException("Fare exceeds the supported range.");

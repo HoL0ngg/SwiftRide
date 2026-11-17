@@ -1,8 +1,45 @@
 # Matching & Pricing: chạy và kiểm thử
 
-Service có bốn lớp: Domain (tọa độ, Strategy, pipeline giá), Application (use case,
+Service có bốn lớp: Domain (tọa độ, Strategy, Decorator tính giá), Application (use case,
 interface persistence/geocoding), Infrastructure (EF Core/Npgsql và Nominatim), Api
 (DTO, JWT, endpoint và composition root). Domain không phụ thuộc framework.
+
+## Strategy và Decorator tính giá
+
+`IPricingStrategy` chọn cách tính giá cơ bản (`standard` hoặc `night`).
+`BaseFare` chuyển kết quả của strategy sang hợp đồng `IFareComponent` và từ chối
+giá cơ bản âm. Bốn decorator cùng triển khai `IFareComponent`, mỗi lớp nhận một
+component bên trong, gọi nó rồi áp dụng một phép tính:
+
+| Component | Phép tính |
+|---|---|
+| `BaseFare` | `strategy.CalculateBase(context)` |
+| `SurgeDecorator` | Giá bên trong × surge |
+| `TollDecorator` | Giá bên trong + toll |
+| `PromotionDecorator` | Giá bên trong × promotionFactor |
+| `TaxDecorator` | Giá bên trong × (1 + tax) |
+
+Các lớp nằm trong `src/MatchingService/Domain/FareComponents.cs`.
+`FareCalculator` ghép chuỗi bằng cách bọc lần lượt:
+
+```csharp
+IFareComponent fare = new BaseFare(strategy);
+fare = new SurgeDecorator(fare);
+fare = new TollDecorator(fare);
+fare = new PromotionDecorator(fare);
+fare = new TaxDecorator(fare);
+```
+
+Tax nằm ngoài cùng nhưng gọi component bên trong trước, nên thứ tự tính vẫn là
+**base → surge → toll → promotion → tax**. Decorator không làm tròn.
+`FareCalculator.Calculate` là điểm vào: kiểm tra context và rounding policy,
+chạy chuỗi, làm tròn một lần thành VND và kiểm tra giới hạn số tiền; overflow
+được chuyển thành `MatchingDomainException`.
+
+Ví dụ base 60.000, surge 1,2, toll 5.000, promotion 0,9 và tax 0,08 cho kết quả
+74.844 VND. Đổi thứ tự toll và surge sẽ đổi giá nên không cấu hình thứ tự tùy ý.
+Thiết kế này thay pipeline `IFareStep` cũ, giữ nguyên API, quote snapshot,
+`PrepareContext` và schema database; không cần migration hay thư viện mới.
 
 ## API hiện có
 

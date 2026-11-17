@@ -5,6 +5,37 @@ namespace SwiftRide.MatchingService.Tests;
 public class PricingTests
 {
     [Fact]
+    public void Decorators_compose_fare_without_rounding_intermediate_amounts()
+    {
+        IFareComponent fare = new BaseFare(new StandardPricingStrategy());
+        fare = new SurgeDecorator(fare);
+        fare = new TollDecorator(fare);
+        fare = new PromotionDecorator(fare);
+        fare = new TaxDecorator(fare);
+
+        var context = new PricingContext(1, 0, 2.5m, 0, 1.2m, 1m, .9m, .08m);
+
+        Assert.Equal(3.888m, fare.Calculate(context));
+        Assert.Equal(4m, new FareCalculator(new StandardPricingStrategy())
+            .Calculate(context, MidpointRounding.AwayFromZero));
+    }
+
+    [Fact]
+    public void Negative_base_fare_is_rejected_even_when_toll_would_make_total_positive()
+    {
+        var context = new PricingContext(1, 0, 1, 0, 1, 100, 1, 0);
+
+        Assert.Throws<MatchingDomainException>(() => new FareCalculator(new NegativePricingStrategy())
+            .Calculate(context, MidpointRounding.AwayFromZero));
+    }
+
+    private sealed class NegativePricingStrategy : IPricingStrategy
+    {
+        public string Mode => "negative";
+        public decimal CalculateBase(PricingContext context) => -1m;
+    }
+
+    [Fact]
     public void Fare_applies_steps_in_order_and_rounds_once()
     {
         var calculator = new FareCalculator(new StandardPricingStrategy());
