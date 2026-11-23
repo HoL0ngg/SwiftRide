@@ -2,7 +2,8 @@ using System.Text.Json.Serialization;
 using SwiftRide.PaymentService.Application;
 using SwiftRide.PaymentService.Infrastructure;
 using SwiftRide.PaymentService.Api.Observability;
-
+using Microsoft.Extensions.Options;
+using SwiftRide.PaymentService.Application.Payments;
 namespace SwiftRide.PaymentService.Api;
 
 public static class PaymentApplication
@@ -19,6 +20,15 @@ public static class PaymentApplication
             o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
         builder.Services.AddPaymentApplication();
+        builder.Services.AddOptions<PaymentProcessingSettings>()
+            .Bind(builder.Configuration.GetSection(PaymentProcessingSettings.SectionName))
+            .Validate(s => s.MaxAttempts >= 1, "PaymentProcessing:MaxAttempts must be >= 1")
+            .Validate(s => s.LeaseSeconds >= 1, "PaymentProcessing:LeaseSeconds must be >= 1")
+            .Validate(s => s.PendingLeaseSeconds >= 1, "PaymentProcessing:PendingLeaseSeconds must be >= 1")
+            .ValidateOnStart();
+
+        builder.Services.AddSingleton(sp =>
+            sp.GetRequiredService<IOptions<PaymentProcessingSettings>>().Value);
         builder.Services.AddInfrastructure(builder.Configuration);
 
         configureServices?.Invoke(builder.Services);

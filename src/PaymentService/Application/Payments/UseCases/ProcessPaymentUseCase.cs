@@ -15,12 +15,13 @@ public sealed class ProcessPaymentUseCase(
     IPaymentGatewayFactory gateways, GatewayCallPolicy callPolicy,
     TimeProvider clock, ILogger<ProcessPaymentUseCase> logger,
     IPaymentProcessingStore? processingStore = null,
-    IPaymentMetrics? metrics = null)
+    IPaymentMetrics? metrics = null,
+    PaymentProcessingSettings? processingSettings = null)
 {
     private readonly IPaymentMetrics _metrics = metrics ?? NullPaymentMetrics.Instance;
-
+    private readonly PaymentProcessingSettings _cfg = processingSettings ?? new();
     // Phải lớn hơn timeout cổng (mặc định 10s). Pending quá hạn này mới được xử lý tiếp (dành cho fallback khi không có processingStore).
-    private static readonly TimeSpan PendingLease = TimeSpan.FromSeconds(30);
+    // private static readonly TimeSpan PendingLease = TimeSpan.FromSeconds(30);
 
     public async Task<PaymentResult> ExecuteAsync(ProcessPaymentInput input, CancellationToken ct)
     {
@@ -64,7 +65,7 @@ public sealed class ProcessPaymentUseCase(
 
             if (processingStore is null)
             {
-                var stale = clock.GetUtcNow() - existing.UpdatedAt >= PendingLease;
+                var stale = clock.GetUtcNow() - existing.UpdatedAt >= _cfg.PendingLease;
                 if (!stale) return await ReplayAsync(existing, candidate, ct);
                 existing.AdoptDriverFrom(candidate);
                 payment = existing;
@@ -105,7 +106,7 @@ public sealed class ProcessPaymentUseCase(
         PaymentProcessingDto? processingDto = null;
         if (processingStore is not null)
         {
-            var claim = await processingStore.TryClaimAsync(payment.Id, ownerId, now, TimeSpan.FromSeconds(60), maxAttempts: 3, ct);
+            var claim = await processingStore.TryClaimAsync(payment.Id, ownerId, now, _cfg.Lease, maxAttempts: _cfg.MaxAttempts, ct);
             switch (claim.Status)
             {
                 case ClaimStatus.AlreadyCompleted:

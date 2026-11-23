@@ -79,7 +79,16 @@ services:
       RabbitMQ__Host: ${RABBITMQ_HOST:-}
       RabbitMQ__Username: ${RABBITMQ_USER:-guest}
       RabbitMQ__Password: ${RABBITMQ_PASSWORD:-guest}
+      # Retry của MassTransit (demo nhanh)
+      # RabbitMQ__RetryCount: "2"
+      # RabbitMQ__RetryMinIntervalSeconds: "5"
+      # RabbitMQ__RetryMaxIntervalSeconds: "10"
+      # RabbitMQ__RetryDeltaSeconds: "2"
 
+      # # Lease và số lần gọi cổng
+      # PaymentProcessing__MaxAttempts: "3"
+      # PaymentProcessing__LeaseSeconds: "5"
+      # PaymentProcessing__PendingLeaseSeconds: "30"
     depends_on:
       rabbitmq:
         condition: service_healthy

@@ -1,11 +1,12 @@
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using SwiftRide.PaymentService.Application.Abstractions;
+using SwiftRide.PaymentService.Application.Payments;
 using SwiftRide.PaymentService.Application.Payments.Dtos;
 
 namespace SwiftRide.PaymentService.Infrastructure.Persistence;
 
-public sealed class PaymentProcessingStore(PaymentDbContext db) : IPaymentProcessingStore
+public sealed class PaymentProcessingStore(PaymentDbContext db, PaymentProcessingSettings settings) : IPaymentProcessingStore
 {
     public async Task<PaymentProcessingDto?> GetAsync(Guid paymentId, CancellationToken ct)
     {
@@ -14,9 +15,10 @@ public sealed class PaymentProcessingStore(PaymentDbContext db) : IPaymentProces
             .FirstOrDefaultAsync(p => p.PaymentId == paymentId, ct);
 
         if (record is null) return null;
-
-        var canRetry = record.AttemptsStarted < 3 && record.Outcome == "pending";
-        var requiresAction = record.AttemptsStarted >= 3 && record.Outcome == "pending";
+        
+        var max = settings.MaxAttempts;
+        var canRetry = record.AttemptsStarted < max && record.Outcome == "pending";
+        var requiresAction = record.AttemptsStarted >= max && record.Outcome == "pending";
 
         return new PaymentProcessingDto(
             record.AttemptsStarted,
@@ -171,17 +173,17 @@ public sealed class PaymentProcessingStore(PaymentDbContext db) : IPaymentProces
     }
 }
 
-public sealed class InMemoryPaymentProcessingStore : IPaymentProcessingStore
+public sealed class InMemoryPaymentProcessingStore(PaymentProcessingSettings? settings = null) : IPaymentProcessingStore
 {
     private sealed record Entry(string RequestHash, string DriverId, int Attempts, Guid? Owner, DateTimeOffset? LeaseUntil, string Outcome);
     private readonly ConcurrentDictionary<Guid, Entry> _entries = new();
-
+    private readonly int _max = (settings ?? new()).MaxAttempts;
     public Task<PaymentProcessingDto?> GetAsync(Guid paymentId, CancellationToken ct)
     {
         if (_entries.TryGetValue(paymentId, out var e))
         {
-            var canRetry = e.Attempts < 3 && e.Outcome == "pending";
-            var requiresAction = e.Attempts >= 3 && e.Outcome == "pending";
+            var canRetry = e.Attempts < _max && e.Outcome == "pending";
+            var requiresAction = e.Attempts >= _max && e.Outcome == "pending";
             return Task.FromResult<PaymentProcessingDto?>(new PaymentProcessingDto(e.Attempts, e.LeaseUntil, canRetry, requiresAction));
         }
         return Task.FromResult<PaymentProcessingDto?>(null);
