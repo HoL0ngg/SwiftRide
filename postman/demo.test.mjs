@@ -72,6 +72,95 @@ test('observer binds all thirteen events and reads with requeue without business
   assert.ok(!observer.variable.some(v => /password/i.test(v.key) && v.value));
 });
 
+test('RabbitMQ duplicate-message folder republishes the same event and asserts one settlement', () => {
+  const collection = load('./SwiftRide.Gateway.Demo.rabbitmqCrashed.json');
+  const folder = collection.item.flatMap(item => item.item ?? [])
+    .find(item => item.name === '02 Duplicate RideCompleted message');
+  assert.ok(folder, 'Missing duplicate-message folder');
+  const requests = flatten(folder.item);
+  const publish = requests.find(request => request.name === '02 Publish RideCompleted twice');
+  const readSettled = requests.find(request => request.name === '02 Verify one PaymentSettled');
+  assert.ok(publish && readSettled, 'Missing duplicate-message requests');
+  const duplicateScripts = requests.flatMap(request => request.event ?? [])
+    .map(event => event.script.exec.join('\n')).join('\n');
+  assert.doesNotMatch(duplicateScripts, /pm\.variables\.(?:get|set)\(['"]duplicate_/,
+    'Duplicate test state must persist in collection variables between individual sends');
+  assert.match(duplicateScripts, /pm\.collectionVariables\.set\('duplicate_event_id'/);
+  assert.ok(publish.request.url.includes('/api/exchanges/%2F/SwiftRide.Contracts.V1%3ARideCompletedV1/publish'));
+  assert.equal(folder.auth.type, 'basic');
+  assert.ok(requests.every(request => request.request.auth === undefined),
+    'Requests must inherit Management API credentials from the folder');
+  for (const request of requests) {
+    for (const event of request.event ?? []) new Script(event.script.exec.join('\n'));
+  }
+  const preRequest = publish.event.find(event => event.listen === 'prerequest');
+  const responseScript = publish.event.find(event => event.listen === 'test');
+  assert.ok(preRequest && responseScript, 'Publish request needs preparation and post-response scripts');
+  assert.match(preRequest.script.exec.join('\n'), /messageType.*RideCompletedV1/);
+  const eventValues = new Map([
+    ['duplicate_event_id', 'event-1'],
+    ['duplicate_trip_id', 'trip-1'],
+    ['duplicate_quote_id', 'quote-1'],
+    ['duplicate_run_id', 'run-1'],
+    ['duplicate_occurred_at', '2026-11-25T00:00:00.000Z'],
+  ]);
+  const preparedBodies = [];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let updatedBody;
+    const pm = {
+      collectionVariables: { get: key => eventValues.get(key) },
+      request: { body: { update: body => { updatedBody = body; } } },
+    };
+    runInNewContext(preRequest.script.exec.join('\n'), { pm });
+    preparedBodies.push(updatedBody.raw);
+  }
+  assert.equal(preparedBodies[0], preparedBodies[1], 'Both deliveries must use the exact same event envelope');
+  const published = JSON.parse(preparedBodies[0]);
+  const envelope = JSON.parse(published.payload);
+  assert.equal(envelope.message.eventId, 'event-1');
+  assert.equal(envelope.message.tripId, 'trip-1');
+  const verifyScript = readSettled.event.find(event => event.listen === 'test').script.exec.join('\n');
+  const verifySettlements = messages => {
+    const failures = [];
+    const pm = {
+      expect,
+      response: { code: 200, json: () => messages },
+      collectionVariables: { get: key => key === 'duplicate_trip_id' ? 'trip-1' : undefined },
+      execution: { setNextRequest: () => {} },
+      info: { requestName: readSettled.name },
+      test: (_name, action) => { try { action(); } catch (error) { failures.push(error); } },
+    };
+    runInNewContext(verifyScript, { pm });
+    return failures;
+  };
+  const settlement = { payload: JSON.stringify({ message: { tripId: 'trip-1' } }) };
+  assert.deepEqual(verifySettlements([settlement]), []);
+  assert.equal(verifySettlements([settlement, settlement]).length, 1,
+    'Two settlement events for the trip must fail the Postman assertion');
+  const values = new Map([['duplicate_publish_attempt', 0]]);
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    let next;
+    const failures = [];
+    const pm = {
+      expect,
+      response: { code: 200, json: () => ({ routed: true }) },
+      info: { requestName: publish.name },
+      collectionVariables: { get: key => values.get(key), set: (key, value) => values.set(key, value) },
+      execution: { setNextRequest: name => { next = name; } },
+      test: (_name, action) => { try { action(); } catch (error) { failures.push(error); } },
+    };
+    for (const event of publish.event.filter(event => event.listen === 'test')) {
+      runInNewContext(event.script.exec.join('\n'), { pm });
+    }
+    assert.deepEqual(failures, [], `publish attempt ${attempt}`);
+    assert.equal(next, attempt === 1 ? publish.name : undefined);
+  }
+  assert.equal(values.get('duplicate_publish_attempt'), 2);
+  assert.ok(readSettled.event.some(event =>
+    event.listen === 'test' && event.script.exec.join('\n').includes('to.have.lengthOf(1)')),
+  'The observer response must assert exactly one PaymentSettled event');
+});
+
 test('every demo quote poll accepts a valid quote and fails malformed or exhausted responses', () => {
   const demo = load('./SwiftRide.Gateway.Demo.postman_collection.json');
   for (const item of flatten(demo.item).filter(r => r.name.endsWith('Wait for Quoted'))) {

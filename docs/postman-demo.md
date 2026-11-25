@@ -89,6 +89,16 @@ Các giá trị hợp lệ: `success`, `declined`, `timeout`; bỏ trường nà
 
 Hai folder lỗi cố ý để lại chuyến `PaymentPending`; đây không phải terminal. Rider tương ứng vẫn có chuyến hoạt động. Các lần chạy sau dùng rider mới. Không dọn bằng cách sửa `Paid`, xóa ledger hoặc tạo chuyến khác với cùng rider để lách trạng thái. Refund/Saga và poison message được hướng dẫn vận hành trong `messaging-operations.md`; collection này không giả lập business event để ép bù trừ.
 
+## Kiểm thử message trùng trong Postman
+
+Trong `SwiftRide.Gateway.Demo.rabbitmqCrashed.json`, chọn folder con `02 Duplicate RideCompleted message` bên trong `01 Success, idempotency and authorization`. Chọn `SwiftRide.Local.postman_environment.json` và điền tài khoản RabbitMQ Management local vào `rabbitmq_user` / `rabbitmq_password`.
+
+Có thể chạy toàn folder bằng Collection Runner (1 iteration, delay 1000 ms), hoặc gửi từng request: gửi `02 Create settlement observer` trước để khởi tạo các `collectionVariables`, rồi gửi lần lượt Bind → Publish → Wait → Verify → Delete. Khi gửi riêng request Publish, bấm **Send hai lần** để tạo hai lần giao message; `setNextRequest` chỉ tự lặp khi chạy bằng Runner. Khi gửi riêng Wait, nếu `messages_ready` còn 0 thì bấm Send lại cho tới khi có settlement. Không chạy lại request khởi tạo giữa chừng vì request đó sinh ID mới.
+
+Folder tạo queue quan sát có tên ngẫu nhiên, bind vào `PaymentSettledV1`, rồi publish cùng một envelope `RideCompletedV1` hai lần với cùng `EventId`, `TripId` và idempotency key. Kỳ vọng Postman nhận đúng một `PaymentSettledV1` cho `TripId` tổng hợp đó. Queue quan sát được xóa ở bước cuối; nếu run dừng giữa chừng, queue tự hết hạn trong một giờ.
+
+Đây là kịch bản Development, tạo một payment tổng hợp trong `paydb` và có thể khiến Trip ghi inbox `TripNotFound` cho settlement này. Kiểm tra một settlement event là bằng chứng message duplicate không tạo outcome lần hai; muốn xác nhận số payment và hai dòng ledger thì kiểm tra trực tiếp database PayDB hoặc chạy integration test, không expose route nội bộ qua Gateway.
+
 ## Xem message trong queue nghiệp vụ nếu muốn trình bày từng bước
 
 Ưu tiên queue quan sát vì không gián đoạn xử lý. Nếu cần thấy message thực sự đang chờ ở queue nghiệp vụ, trong môi trường demo riêng:

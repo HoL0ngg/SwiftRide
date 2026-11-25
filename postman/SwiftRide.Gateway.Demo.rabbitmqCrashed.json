@@ -1,19 +1,9 @@
 {
   "info": {
-    "name": "SwiftRide Gateway Demo",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Run each entire folder, one iteration, delay 1000 ms, request timeout 20000 ms. Development only. Default Events requires RabbitMQ on Trip/Matching/Payment. See docs/postman-demo.md. Failure folders intentionally leave unresolved PaymentPending trips. Mock only; no real card data."
+    "_postman_id": "36638f56-063d-4f31-bb4c-ccd0185aa824",
+    "name": "RabbitMQ Crashed",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "variable": [
-    {
-      "key": "base_url",
-      "value": "http://localhost:5080"
-    },
-    {
-      "key": "payment_transport",
-      "value": "Events"
-    }
-  ],
   "item": [
     {
       "name": "01 Success, idempotency and authorization",
@@ -36,18 +26,18 @@
                 "type": "text/javascript",
                 "exec": [
                   "const run = pm.variables.replaceIn('{{$guid}}');",
-                  "pm.variables.set('run_id', run);",
-                  "pm.variables.set('rider_id', 'pm-01-rider-' + run);",
-                  "pm.variables.set('demo_driver_id', 'pm-01-driver-' + run);",
-                  "pm.variables.set('latitude', 1);",
-                  "pm.variables.set('quote_polls', 0);",
-                  "pm.variables.set('offer_polls', 0);",
-                  "pm.variables.set('payment_polls', 0);",
-                  "pm.variables.set('rejected_driver_ids', '[]');",
-                  "pm.variables.unset('trip_id');",
-                  "pm.variables.unset('quote_id');",
-                  "pm.variables.unset('fare_amount');",
-                  "pm.variables.unset('offered_driver_id');"
+                  "pm.collectionVariables.set('run_id', run);",
+                  "pm.collectionVariables.set('rider_id', 'pm-01-rider-' + run);",
+                  "pm.collectionVariables.set('demo_driver_id', 'pm-01-driver-' + run);",
+                  "pm.collectionVariables.set('latitude', 1);",
+                  "pm.collectionVariables.set('quote_polls', 0);",
+                  "pm.collectionVariables.set('offer_polls', 0);",
+                  "pm.collectionVariables.set('payment_polls', 0);",
+                  "pm.collectionVariables.set('rejected_driver_ids', '[]');",
+                  "pm.collectionVariables.unset('trip_id');",
+                  "pm.collectionVariables.unset('quote_id');",
+                  "pm.collectionVariables.unset('fare_amount');",
+                  "pm.collectionVariables.unset('offered_driver_id');"
                 ]
               }
             },
@@ -88,7 +78,7 @@
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const token = pm.response.json().access_token;",
                   "pm.expect(token).to.be.a('string').and.not.empty;",
-                  "pm.variables.set('rider_token', token);",
+                  "pm.collectionVariables.set('rider_token', token);",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
                   "});"
                 ]
@@ -118,7 +108,7 @@
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const token = pm.response.json().access_token;",
                   "pm.expect(token).to.be.a('string').and.not.empty;",
-                  "pm.variables.set('demo_token', token);",
+                  "pm.collectionVariables.set('demo_token', token);",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
                   "});"
                 ]
@@ -215,7 +205,7 @@
                   "pm.expect(pm.response.code).to.be.oneOf([201, 202]);",
                   "const trip = pm.response.json();",
                   "pm.expect(trip.id).to.be.a('string').and.not.empty;",
-                  "pm.variables.set('trip_id', trip.id);",
+                  "pm.collectionVariables.set('trip_id', trip.id);",
                   "pm.expect(trip.status).to.be.oneOf(['Requested', 'Quoted', 'Failed']);",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
                   "});"
@@ -250,10 +240,10 @@
                   "  try {",
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const trip = pm.response.json();",
-                  "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
+                  "pm.expect(trip.id).to.eql(pm.collectionVariables.get('trip_id'));",
                   "if (trip.status === 'Requested') {",
-                  "  const count = Number(pm.variables.get('quote_polls') || 0) + 1;",
-                  "  pm.variables.set('quote_polls', count);",
+                  "  const count = Number(pm.collectionVariables.get('quote_polls') || 0) + 1;",
+                  "  pm.collectionVariables.set('quote_polls', count);",
                   "  pm.expect(count, 'quote polling limit exceeded').to.be.below(60);",
                   "  pm.execution.setNextRequest(pm.info.requestName);",
                   "} else {",
@@ -261,8 +251,8 @@
                   "  pm.expect(trip.quoteId).to.be.a('string').and.not.empty;",
                   "  pm.expect(trip.fareAmount).to.match(/^[0-9]+$/);",
                   "  pm.expect(trip.currency).to.eql('VND');",
-                  "  pm.variables.set('quote_id', trip.quoteId);",
-                  "  pm.variables.set('fare_amount', trip.fareAmount);",
+                  "  pm.collectionVariables.set('quote_id', trip.quoteId);",
+                  "  pm.collectionVariables.set('fare_amount', trip.fareAmount);",
                   "}",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
                   "});"
@@ -341,8 +331,8 @@
                   "  try {",
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const trip = pm.response.json();",
-                  "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-                  "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+                  "pm.expect(trip.id).to.eql(pm.collectionVariables.get('trip_id'));",
+                  "pm.expect(trip.fareAmount).to.eql(pm.collectionVariables.get('fare_amount'));",
                   "pm.expect(trip.currency).to.eql('VND');",
                   "pm.expect(trip.status).to.be.oneOf([\"DriverOffered\"]);",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
@@ -378,20 +368,20 @@
                   "  try {",
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const trip = pm.response.json();",
-                  "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-                  "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+                  "pm.expect(trip.id).to.eql(pm.collectionVariables.get('trip_id'));",
+                  "pm.expect(trip.fareAmount).to.eql(pm.collectionVariables.get('fare_amount'));",
                   "pm.expect(trip.currency).to.eql('VND');",
                   "if (trip.status === 'DriverOffered' && !trip.offeredDriverId) {",
-                  "  const count = Number(pm.variables.get('offer_polls') || 0) + 1;",
-                  "  pm.variables.set('offer_polls', count);",
+                  "  const count = Number(pm.collectionVariables.get('offer_polls') || 0) + 1;",
+                  "  pm.collectionVariables.set('offer_polls', count);",
                   "  pm.expect(count, 'offer polling limit exceeded').to.be.below(60);",
                   "  pm.execution.setNextRequest(pm.info.requestName);",
                   "} else {",
                   "  pm.expect(trip.status).to.eql('DriverOffered');",
                   "  pm.expect(trip.offeredDriverId).to.be.a('string').and.not.empty;",
-                  "  const rejected = JSON.parse(pm.variables.get('rejected_driver_ids'));",
+                  "  const rejected = JSON.parse(pm.collectionVariables.get('rejected_driver_ids'));",
                   "  pm.expect(rejected).not.to.include(trip.offeredDriverId);",
-                  "  pm.variables.set('offered_driver_id', trip.offeredDriverId);",
+                  "  pm.collectionVariables.set('offered_driver_id', trip.offeredDriverId);",
                   "}",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
                   "});"
@@ -422,7 +412,7 @@
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const token = pm.response.json().access_token;",
                   "pm.expect(token).to.be.a('string').and.not.empty;",
-                  "pm.variables.set('driver_token', token);",
+                  "pm.collectionVariables.set('driver_token', token);",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
                   "});"
                 ]
@@ -452,7 +442,7 @@
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const token = pm.response.json().access_token;",
                   "pm.expect(token).to.be.a('string').and.not.empty;",
-                  "pm.variables.set('other_token', token);",
+                  "pm.collectionVariables.set('other_token', token);",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
                   "});"
                 ]
@@ -584,8 +574,8 @@
                   "  try {",
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const trip = pm.response.json();",
-                  "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-                  "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+                  "pm.expect(trip.id).to.eql(pm.collectionVariables.get('trip_id'));",
+                  "pm.expect(trip.fareAmount).to.eql(pm.collectionVariables.get('fare_amount'));",
                   "pm.expect(trip.currency).to.eql('VND');",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
                   "});"
@@ -673,8 +663,8 @@
                   "  try {",
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const trip = pm.response.json();",
-                  "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-                  "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+                  "pm.expect(trip.id).to.eql(pm.collectionVariables.get('trip_id'));",
+                  "pm.expect(trip.fareAmount).to.eql(pm.collectionVariables.get('fare_amount'));",
                   "pm.expect(trip.currency).to.eql('VND');",
                   "pm.expect(trip.status).to.be.oneOf([\"DriverAccepted\"]);",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
@@ -799,8 +789,8 @@
                   "  try {",
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const trip = pm.response.json();",
-                  "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-                  "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+                  "pm.expect(trip.id).to.eql(pm.collectionVariables.get('trip_id'));",
+                  "pm.expect(trip.fareAmount).to.eql(pm.collectionVariables.get('fare_amount'));",
                   "pm.expect(trip.currency).to.eql('VND');",
                   "pm.expect(trip.status).to.be.oneOf([\"EnRoute\"]);",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
@@ -840,8 +830,8 @@
                   "  try {",
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const trip = pm.response.json();",
-                  "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-                  "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+                  "pm.expect(trip.id).to.eql(pm.collectionVariables.get('trip_id'));",
+                  "pm.expect(trip.fareAmount).to.eql(pm.collectionVariables.get('fare_amount'));",
                   "pm.expect(trip.currency).to.eql('VND');",
                   "pm.expect(trip.status).to.be.oneOf([\"PickedUp\"]);",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
@@ -881,8 +871,8 @@
                   "  try {",
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const trip = pm.response.json();",
-                  "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-                  "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+                  "pm.expect(trip.id).to.eql(pm.collectionVariables.get('trip_id'));",
+                  "pm.expect(trip.fareAmount).to.eql(pm.collectionVariables.get('fare_amount'));",
                   "pm.expect(trip.currency).to.eql('VND');",
                   "pm.expect(trip.status).to.be.oneOf([\"PaymentPending\",\"Paid\"]);",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
@@ -918,12 +908,12 @@
                   "  try {",
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const trip = pm.response.json();",
-                  "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-                  "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+                  "pm.expect(trip.id).to.eql(pm.collectionVariables.get('trip_id'));",
+                  "pm.expect(trip.fareAmount).to.eql(pm.collectionVariables.get('fare_amount'));",
                   "pm.expect(trip.currency).to.eql('VND');",
                   "if (trip.status === 'PaymentPending') {",
-                  "  const count = Number(pm.variables.get('payment_polls') || 0) + 1;",
-                  "  pm.variables.set('payment_polls', count);",
+                  "  const count = Number(pm.collectionVariables.get('payment_polls') || 0) + 1;",
+                  "  pm.collectionVariables.set('payment_polls', count);",
                   "  pm.expect(count, 'payment polling limit exceeded').to.be.below(60);",
                   "  pm.execution.setNextRequest(pm.info.requestName);",
                   "} else {",
@@ -966,10 +956,147 @@
                   "  try {",
                   "pm.expect(pm.response.code).to.eql(200);",
                   "const trip = pm.response.json();",
-                  "pm.expect(trip.id).to.eql(pm.variables.get('trip_id'));",
-                  "pm.expect(trip.fareAmount).to.eql(pm.variables.get('fare_amount'));",
+                  "pm.expect(trip.id).to.eql(pm.collectionVariables.get('trip_id'));",
+                  "pm.expect(trip.fareAmount).to.eql(pm.collectionVariables.get('fare_amount'));",
                   "pm.expect(trip.currency).to.eql('VND');",
                   "pm.expect(trip.status).to.be.oneOf([\"Paid\"]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01 Duplicate RideCompleted published",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{{ride_completed_body}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{rabbit_mgmt_url}}/api/exchanges/{{rabbit_vhost}}/{{rabbit_exchange}}/publish",
+            "description": "Re-publishes RideCompletedV1 (same EventId as the original) via RabbitMQ Management API. Paste the EventId logged by RideCompletedConsumer into ride_completed_event_id first. Expected PaymentService log: [DUPLICATE] RideCompletedV1 <EventId> for trip <TripId> was already processed at <time>. Skipping duplicate. Lands in *_skipped => wrong masstransit_message_type; *_error => read MT-Fault-* headers."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Re-publish RideCompletedV1 with an EventId that the Payment inbox has ALREADY processed.",
+                  "// Copy EventId from the PaymentService log of the original message (\"EventId : ...\") into",
+                  "// the collection variable ride_completed_event_id before running this request.",
+                  "const guid = () => pm.variables.replaceIn('{{$guid}}');",
+                  "const eventId = pm.collectionVariables.get('ride_completed_event_id');",
+                  "if (!/^[0-9a-fA-F-]{36}$/.test(eventId || '')) {",
+                  "  throw new Error('Set collection variable ride_completed_event_id to the EventId logged by RideCompletedConsumer.');",
+                  "}",
+                  "const fare = Number(pm.collectionVariables.get('fare_amount'));",
+                  "const envelope = {",
+                  "  messageId: guid(), // transport MessageId: new each time. De-duplication is done by message.eventId.",
+                  "  conversationId: guid(),",
+                  "  sourceAddress: 'rabbitmq://localhost/postman-demo',",
+                  "  messageType: [pm.collectionVariables.get('masstransit_message_type')],",
+                  "  message: {",
+                  "    eventId: eventId,",
+                  "    tripId: pm.collectionVariables.get('trip_id'),",
+                  "    quoteId: pm.collectionVariables.get('quote_id'),",
+                  "    riderId: pm.collectionVariables.get('rider_id'),",
+                  "    driverId: pm.collectionVariables.get('offered_driver_id'),",
+                  "    fareAmount: isNaN(fare) ? pm.collectionVariables.get('fare_amount') : fare,",
+                  "    fareCurrency: 'VND',",
+                  "    paymentMethod: pm.collectionVariables.get('ride_completed_payment_method') || 'Card',",
+                  "    paymentIdempotencyKey: pm.collectionVariables.get('ride_completed_payment_key') || ('postman-dup-' + eventId),",
+                  "    mockTokenAlias: pm.collectionVariables.get('ride_completed_token_alias') || null,",
+                  "    occurredAtUtc: new Date().toISOString(),",
+                  "    correlationId: guid(),",
+                  "    causationId: guid()",
+                  "  },",
+                  "  sentTime: new Date().toISOString(),",
+                  "  headers: {}",
+                  "};",
+                  "pm.collectionVariables.set('ride_completed_body', JSON.stringify({",
+                  "  properties: { delivery_mode: 2, content_type: 'application/vnd.masstransit+json', message_id: envelope.messageId },",
+                  "  routing_key: pm.collectionVariables.get('rabbit_routing_key') || '',",
+                  "  payload: JSON.stringify(envelope),",
+                  "  payload_encoding: 'string'",
+                  "}));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.eql(200);",
+                  "pm.expect(pm.response.json().routed, 'message was not routed: check rabbit_exchange / rabbit_routing_key / bindings').to.eql(true);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01 Duplicate RideCompleted keeps trip Paid",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rider_token}}"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": "{{base_url}}/trips/{{trip_id}}",
+            "description": "Run the entire scenario folder in order. See docs/postman-demo.md. English script names identify assertions in Runner."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.eql(200);",
+                  "const trip = pm.response.json();",
+                  "pm.expect(trip.id).to.eql(pm.collectionVariables.get('trip_id'));",
+                  "pm.expect(trip.status).to.eql('Paid');",
+                  "pm.expect(trip.fareAmount).to.eql(pm.collectionVariables.get('fare_amount'));",
+                  "pm.expect(trip.currency).to.eql('VND');",
                   "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
                   "});"
                 ]
@@ -1053,8 +1180,411 @@
               }
             }
           ]
+        },
+        {
+          "name": "02 Duplicate RideCompleted message",
+          "description": "Development-only at-least-once delivery test. Run 02 Create settlement observer first to initialize collectionVariables; then send each request individually or run the folder. Requires a running PaymentService and RabbitMQ Management credentials in the selected local Postman environment.",
+          "auth": {
+            "type": "basic",
+            "basic": [
+              {
+                "key": "username",
+                "value": "{{rabbitmq_user}}",
+                "type": "string"
+              },
+              {
+                "key": "password",
+                "value": "{{rabbitmq_password}}",
+                "type": "string"
+              }
+            ]
+          },
+          "item": [
+            {
+              "name": "02 Create settlement observer",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{rabbitmq_url}}/api/queues/%2F/{{duplicate_observer_queue}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"durable\": false,\n  \"auto_delete\": false,\n  \"arguments\": {\n    \"x-expires\": 3600000,\n    \"x-message-ttl\": 3600000\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('rabbitmq_user') || !pm.variables.get('rabbitmq_password')) throw new Error('Set rabbitmq_user and rabbitmq_password in a local Postman environment.');",
+                      "const run = pm.variables.replaceIn('{{$guid}}');",
+                      "pm.collectionVariables.set('duplicate_run_id', run);",
+                      "pm.collectionVariables.set('duplicate_observer_queue', 'demo-duplicate-' + run);",
+                      "pm.collectionVariables.set('duplicate_event_id', pm.variables.replaceIn('{{$guid}}'));",
+                      "pm.collectionVariables.set('duplicate_trip_id', pm.variables.replaceIn('{{$guid}}'));",
+                      "pm.collectionVariables.set('duplicate_quote_id', pm.variables.replaceIn('{{$guid}}'));",
+                      "pm.collectionVariables.set('duplicate_occurred_at', new Date().toISOString());",
+                      "pm.collectionVariables.set('duplicate_publish_attempt', 0);",
+                      "pm.collectionVariables.set('duplicate_poll_count', 0);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(pm.info.requestName, function () {",
+                      "  try {",
+                      "pm.expect(pm.response.code).to.be.oneOf([201, 204]);",
+                      "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 Bind settlement observer",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3APaymentSettledV1/q/{{duplicate_observer_queue}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(pm.info.requestName, function () {",
+                      "  try {",
+                      "pm.expect(pm.response.code).to.be.oneOf([201, 204]);",
+                      "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 Publish RideCompleted twice",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{rabbitmq_url}}/api/exchanges/%2F/SwiftRide.Contracts.V1%3ARideCompletedV1/publish",
+                "description": "Collection Runner repeats this request once automatically. When sending requests individually, click Send twice; collectionVariables keep the EventId and payload unchanged.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const message = { eventId: pm.collectionVariables.get('duplicate_event_id'), tripId: pm.collectionVariables.get('duplicate_trip_id'), riderId: 'pm-duplicate-rider-' + pm.collectionVariables.get('duplicate_run_id'), driverId: 'pm-duplicate-driver-' + pm.collectionVariables.get('duplicate_run_id'), quoteId: pm.collectionVariables.get('duplicate_quote_id'), fareAmount: 85000, fareCurrency: 'VND', paymentMethod: 'Card', mockTokenAlias: 'tok_card_ok', paymentIdempotencyKey: 'trip-' + pm.collectionVariables.get('duplicate_trip_id') + '-payment', occurredAtUtc: pm.collectionVariables.get('duplicate_occurred_at'), correlationId: 'pm-duplicate-' + pm.collectionVariables.get('duplicate_run_id'), causationId: null };",
+                      "pm.request.body.update({ mode: 'raw', raw: JSON.stringify({ properties: { delivery_mode: 2, content_type: 'application/vnd.masstransit+json', message_id: message.eventId }, routing_key: '', payload: JSON.stringify({ messageId: message.eventId, messageType: ['urn:message:SwiftRide.Contracts.V1:RideCompletedV1'], message }), payload_encoding: 'string' }) });"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(pm.info.requestName, function () {",
+                      "  try {",
+                      "pm.expect(pm.response.code).to.eql(200);",
+                      "pm.expect(pm.response.json().routed).to.eql(true);",
+                      "const attempt = Number(pm.collectionVariables.get('duplicate_publish_attempt') || 0) + 1;",
+                      "pm.collectionVariables.set('duplicate_publish_attempt', attempt);",
+                      "if (attempt === 1) pm.execution.setNextRequest(pm.info.requestName);",
+                      "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 Wait for settlement",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{rabbitmq_url}}/api/queues/%2F/{{duplicate_observer_queue}}",
+                "description": "Collection Runner retries at most 30 times; use a 1000 ms delay. For an individual Send, repeat while messages_ready is 0.",
+                "event": [
+                  {
+                    "listen": "test",
+                    "script": {
+                      "type": "text/javascript",
+                      "exec": [
+                        "pm.test(pm.info.requestName, function () {",
+                        "  try {",
+                        "pm.expect(pm.response.code).to.eql(200);",
+                        "const ready = Number(pm.response.json().messages_ready || 0);",
+                        "if (ready < 1) {",
+                        "  const attempts = Number(pm.collectionVariables.get('duplicate_poll_count') || 0) + 1;",
+                        "  pm.collectionVariables.set('duplicate_poll_count', attempts);",
+                        "  pm.expect(attempts, 'settlement polling limit exceeded').to.be.below(30);",
+                        "  pm.execution.setNextRequest(pm.info.requestName);",
+                        "}",
+                        "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                        "});"
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "name": "02 Verify one PaymentSettled",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{rabbitmq_url}}/api/queues/%2F/{{duplicate_observer_queue}}/get",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"count\": 100,\n  \"ackmode\": \"ack_requeue_true\",\n  \"encoding\": \"auto\",\n  \"truncate\": 100000\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(pm.info.requestName, function () {",
+                      "  try {",
+                      "pm.expect(pm.response.code).to.eql(200);",
+                      "const messages = pm.response.json();",
+                      "const settlements = messages.filter(entry => {",
+                      "  let envelope;",
+                      "  try { envelope = typeof entry.payload === 'string' ? JSON.parse(entry.payload) : entry.payload; } catch (_) { return false; }",
+                      "  return envelope && envelope.message && envelope.message.tripId === pm.collectionVariables.get('duplicate_trip_id');",
+                      "});",
+                      "pm.expect(settlements, 'one settlement event for this duplicate trip').to.have.lengthOf(1);",
+                      "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                      "});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 Delete settlement observer",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{rabbitmq_url}}/api/queues/%2F/{{duplicate_observer_queue}}",
+                "event": [
+                  {
+                    "listen": "test",
+                    "script": {
+                      "type": "text/javascript",
+                      "exec": [
+                        "pm.test(pm.info.requestName, function () {",
+                        "  try {",
+                        "pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                        "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                        "});"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
         }
       ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5080",
+      "type": "string"
+    },
+    {
+      "key": "payment_transport",
+      "value": "Events",
+      "type": "string"
+    },
+    {
+      "key": "run_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rider_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "demo_driver_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "latitude",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "rider_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "demo_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "driver_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "other_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "trip_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "quote_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fare_amount",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "offered_driver_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "quote_polls",
+      "value": "0",
+      "type": "string"
+    },
+    {
+      "key": "offer_polls",
+      "value": "0",
+      "type": "string"
+    },
+    {
+      "key": "payment_polls",
+      "value": "0",
+      "type": "string"
+    },
+    {
+      "key": "rejected_driver_ids",
+      "value": "[]",
+      "type": "string"
+    },
+    {
+      "key": "rabbit_mgmt_url",
+      "value": "http://localhost:15672"
+    },
+    {
+      "key": "rabbit_user",
+      "value": "swiftride"
+    },
+    {
+      "key": "rabbit_pass",
+      "value": "REPLACE_LOCALLY"
+    },
+    {
+      "key": "rabbit_vhost",
+      "value": "%2F"
+    },
+    {
+      "key": "rabbit_exchange",
+      "value": "SwiftRide.Contracts.V1:RideCompletedV1"
+    },
+    {
+      "key": "rabbit_routing_key",
+      "value": ""
+    },
+    {
+      "key": "ride_completed_body",
+      "value": ""
+    },
+    {
+      "key": "masstransit_message_type",
+      "value": "urn:message:SwiftRide.Contracts.V1:RideCompletedV1"
+    },
+    {
+      "key": "ride_completed_event_id",
+      "value": ""
+    },
+    {
+      "key": "ride_completed_payment_method",
+      "value": "Card"
+    },
+    {
+      "key": "ride_completed_payment_key",
+      "value": ""
+    },
+    {
+      "key": "ride_completed_token_alias",
+      "value": ""
     }
   ]
 }
