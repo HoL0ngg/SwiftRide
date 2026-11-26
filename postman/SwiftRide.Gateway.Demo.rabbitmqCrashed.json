@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "36638f56-063d-4f31-bb4c-ccd0185aa824",
-    "name": "RabbitMQ Crashed",
+    "name": "RabbitMQ Crashed + PaymentFailed",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1445,6 +1445,632 @@
           ]
         }
       ]
+    },
+    {
+      "name": " 02 PaymentFailedV1: IdempotencyConflict and DomainException",
+      "description": "[ADDED] Run this entire folder in order (delay 1000 ms). Independent from folder 01 and from the Gateway: talks only to the RabbitMQ Management API. Needs masstransit_message_type, rabbit_exchange (RideCompletedV1) and rabbit_payment_failed_exchange (PaymentFailedV1).",
+      "item": [
+        {
+          "name": " 02-1 Create PaymentFailed tap queue",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/queues/{{rabbit_vhost}}/{{pf_tap_queue}}",
+            "description": "[ADDED] Temporary queue used to observe PaymentFailedV1 (expires after 10 minutes if not deleted).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"durable\":false,\"auto_delete\":false,\"arguments\":{\"x-expires\":600000}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] PaymentFailedV1 test (RideCompletedConsumer -> idempotency_conflict / domain_error) - BEGIN =====",
+                  "// PaymentKey must be 'trip-{tripId}-payment' (enforced by the Payment domain), so derive it from the trip id.",
+                  "const guid = () => pm.variables.replaceIn('{{$guid}}');",
+                  "const set = (k, v) => pm.collectionVariables.set(k, v);",
+                  "set('pf_polls', 0);",
+                  "set('pf_trip_id', guid());",
+                  "set('pf_payment_key', 'trip-' + pm.collectionVariables.get('pf_trip_id') + '-payment');",
+                  "set('pf_seed_event_id', guid());",
+                  "set('pf_conflict_event_id', guid());",
+                  "set('pf_domain_trip_id', guid());",
+                  "set('pf_domain_key', 'trip-' + pm.collectionVariables.get('pf_domain_trip_id') + '-payment');",
+                  "set('pf_domain_event_id', guid());",
+                  "// ===== [ADDED] PaymentFailedV1 test - END ====="
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] PaymentFailedV1 test (RideCompletedConsumer -> idempotency_conflict / domain_error) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect([201, 204]).to.include(pm.response.code);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] PaymentFailedV1 test - END ====="
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": " 02-2 Bind tap queue to PaymentFailedV1 exchange",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/bindings/{{rabbit_vhost}}/e/{{rabbit_payment_failed_exchange}}/q/{{pf_tap_queue}}",
+            "description": "[ADDED] Fanout binding so the tap queue receives a copy of every PaymentFailedV1. 404 = exchange name is wrong or not created yet.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"routing_key\":\"\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] PaymentFailedV1 test (RideCompletedConsumer -> idempotency_conflict / domain_error) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code, 'exchange rabbit_payment_failed_exchange not found').to.be.oneOf([201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] PaymentFailedV1 test - END ====="
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": " 02-3 Publish RideCompletedV1 seed (creates payment with key)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/exchanges/{{rabbit_vhost}}/{{rabbit_exchange}}/publish",
+            "description": "[ADDED] Seeds a payment with pf_payment_key / pf_trip_id and amount 50000.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{pf_publish_body}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] PaymentFailedV1 test (RideCompletedConsumer -> idempotency_conflict / domain_error) - BEGIN =====",
+                  "// Seed: first payment for this PaymentKey.",
+                  "const guid = () => pm.variables.replaceIn('{{$guid}}');",
+                  "const cv = (k) => pm.collectionVariables.get(k);",
+                  "const envelope = {",
+                  "  messageId: guid(),",
+                  "  conversationId: guid(),",
+                  "  sourceAddress: 'rabbitmq://localhost/postman-demo',",
+                  "  messageType: [cv('masstransit_message_type')],",
+                  "  message: {",
+                  "    eventId: cv('pf_seed_event_id'),",
+                  "    tripId: cv('pf_trip_id'),",
+                  "    quoteId: guid(),",
+                  "    riderId: guid(),",
+                  "    driverId: guid(),",
+                  "    fareAmount: 50000,",
+                  "    fareCurrency: 'VND',",
+                  "    paymentMethod: cv('pf_payment_method') || 'wallet', // same method as folder 01 (Create trip). 'Card' falls back here and requires a PaymentToken.",
+                  "    paymentIdempotencyKey: cv('pf_payment_key'),",
+                  "    mockTokenAlias: cv('ride_completed_token_alias') || cv('pf_token_alias'), // PaymentToken must be non-empty (any payment method)",
+                  "    occurredAtUtc: new Date().toISOString(),",
+                  "    correlationId: guid(),",
+                  "    causationId: guid()",
+                  "  },",
+                  "  sentTime: new Date().toISOString(),",
+                  "  headers: {}",
+                  "};",
+                  "pm.collectionVariables.set('pf_publish_body', JSON.stringify({",
+                  "  properties: { delivery_mode: 2, content_type: 'application/vnd.masstransit+json', message_id: envelope.messageId },",
+                  "  routing_key: cv('rabbit_routing_key') || '',",
+                  "  payload: JSON.stringify(envelope),",
+                  "  payload_encoding: 'string'",
+                  "}));",
+                  "// ===== [ADDED] PaymentFailedV1 test - END ====="
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] PaymentFailedV1 test (RideCompletedConsumer -> idempotency_conflict / domain_error) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.eql(200);",
+                  "pm.expect(pm.response.json().routed, 'not routed: check rabbit_exchange / bindings').to.eql(true);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] PaymentFailedV1 test - END ====="
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": " 02-4 Publish RideCompletedV1 same PaymentKey, different amount (IdempotencyConflictException)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/exchanges/{{rabbit_vhost}}/{{rabbit_exchange}}/publish",
+            "description": "[ADDED] New EventId (not a duplicate), same PaymentKey and trip, amount 99999 instead of 50000 => IdempotencyConflictException => PaymentFailedV1(idempotency_conflict).",
+            "body": {
+              "mode": "raw",
+              "raw": "{{pf_publish_body}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] PaymentFailedV1 test (RideCompletedConsumer -> idempotency_conflict / domain_error) - BEGIN =====",
+                  "// Conflict: same key, different parameters.",
+                  "const guid = () => pm.variables.replaceIn('{{$guid}}');",
+                  "const cv = (k) => pm.collectionVariables.get(k);",
+                  "const envelope = {",
+                  "  messageId: guid(),",
+                  "  conversationId: guid(),",
+                  "  sourceAddress: 'rabbitmq://localhost/postman-demo',",
+                  "  messageType: [cv('masstransit_message_type')],",
+                  "  message: {",
+                  "    eventId: cv('pf_conflict_event_id'),",
+                  "    tripId: cv('pf_trip_id'),",
+                  "    quoteId: guid(),",
+                  "    riderId: guid(),",
+                  "    driverId: guid(),",
+                  "    fareAmount: 99999,",
+                  "    fareCurrency: 'VND',",
+                  "    paymentMethod: cv('pf_payment_method') || 'wallet', // same method as folder 01 (Create trip). 'Card' falls back here and requires a PaymentToken.",
+                  "    paymentIdempotencyKey: cv('pf_payment_key'),",
+                  "    mockTokenAlias: cv('ride_completed_token_alias') || cv('pf_token_alias'), // PaymentToken must be non-empty (any payment method)",
+                  "    occurredAtUtc: new Date().toISOString(),",
+                  "    correlationId: guid(),",
+                  "    causationId: guid()",
+                  "  },",
+                  "  sentTime: new Date().toISOString(),",
+                  "  headers: {}",
+                  "};",
+                  "pm.collectionVariables.set('pf_publish_body', JSON.stringify({",
+                  "  properties: { delivery_mode: 2, content_type: 'application/vnd.masstransit+json', message_id: envelope.messageId },",
+                  "  routing_key: cv('rabbit_routing_key') || '',",
+                  "  payload: JSON.stringify(envelope),",
+                  "  payload_encoding: 'string'",
+                  "}));",
+                  "// ===== [ADDED] PaymentFailedV1 test - END ====="
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] PaymentFailedV1 test (RideCompletedConsumer -> idempotency_conflict / domain_error) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.eql(200);",
+                  "pm.expect(pm.response.json().routed, 'not routed: check rabbit_exchange / bindings').to.eql(true);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] PaymentFailedV1 test - END ====="
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": " 02-5 Wait PaymentFailedV1 idempotency_conflict",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/queues/{{rabbit_vhost}}/{{pf_tap_queue}}/get",
+            "description": "[ADDED] Polls the tap queue. CausationId may be the seed or the conflict EventId depending on which message the consumer handled second.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"count\":50,\"ackmode\":\"ack_requeue_true\",\"encoding\":\"auto\",\"truncate\":50000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] PaymentFailedV1 test (RideCompletedConsumer -> idempotency_conflict / domain_error) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "const pick = (o, k) => { const key = Object.keys(o || {}).find(x => x.toLowerCase() === k.toLowerCase()); return key === undefined ? undefined : o[key]; };",
+                  "const low = (v) => String(v === undefined || v === null ? '' : v).toLowerCase();",
+                  "pm.expect(pm.response.code).to.eql(200);",
+                  "const tripId = low(pm.collectionVariables.get('pf_trip_id'));",
+                  "const found = pm.response.json()",
+                  "  .map(m => { try { return JSON.parse(m.payload); } catch (e) { return null; } })",
+                  "  .filter(Boolean)",
+                  "  .map(env => env.message || env)",
+                  "  .find(m => low(pick(m, 'tripId')) === tripId && pick(m, 'failureCode') === 'idempotency_conflict');",
+                  "if (!found) {",
+                  "  const count = Number(pm.collectionVariables.get('pf_polls') || 0) + 1;",
+                  "  pm.collectionVariables.set('pf_polls', count);",
+                  "  pm.expect(count, 'PaymentFailedV1 (idempotency_conflict) not seen on tap queue: check PaymentService logs / exchange binding').to.be.below(15);",
+                  "  pm.execution.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "  pm.collectionVariables.set('pf_polls', 0);",
+                  "  pm.expect(pick(found, 'isPermanent')).to.eql(true);",
+                  "  pm.expect(low(pick(found, 'paymentKey'))).to.eql(low(pm.collectionVariables.get('pf_payment_key')));",
+                  "  pm.expect(pick(found, 'safeErrorMessage')).to.be.a('string').and.not.empty;",
+                  "  pm.expect(pick(found, 'paymentId') === null || pick(found, 'paymentId') === undefined).to.eql(true);",
+                  "  const allowed = [\"pf_seed_event_id\", \"pf_conflict_event_id\"].map(k => low(pm.collectionVariables.get(k)));",
+                  "  pm.expect(allowed, 'CausationId must be the EventId of the RideCompletedV1 that failed').to.include(low(pick(found, 'causationId')));",
+                  "}",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] PaymentFailedV1 test - END ====="
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": " 02-6 Publish RideCompletedV1 invalid amount (DomainException)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/exchanges/{{rabbit_vhost}}/{{rabbit_exchange}}/publish",
+            "description": "[ADDED] New trip and key with amount pf_domain_amount (default -1000). Expected: DomainException => PaymentFailedV1(domain_error). Change pf_domain_amount if your domain accepts it.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{pf_publish_body}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] PaymentFailedV1 test (RideCompletedConsumer -> idempotency_conflict / domain_error) - BEGIN =====",
+                  "// Domain error: invalid amount.",
+                  "const guid = () => pm.variables.replaceIn('{{$guid}}');",
+                  "const cv = (k) => pm.collectionVariables.get(k);",
+                  "const envelope = {",
+                  "  messageId: guid(),",
+                  "  conversationId: guid(),",
+                  "  sourceAddress: 'rabbitmq://localhost/postman-demo',",
+                  "  messageType: [cv('masstransit_message_type')],",
+                  "  message: {",
+                  "    eventId: cv('pf_domain_event_id'),",
+                  "    tripId: cv('pf_domain_trip_id'),",
+                  "    quoteId: guid(),",
+                  "    riderId: guid(),",
+                  "    driverId: guid(),",
+                  "    fareAmount: Number(cv('pf_domain_amount') || -1000),",
+                  "    fareCurrency: 'VND',",
+                  "    paymentMethod: cv('pf_payment_method') || 'wallet', // same method as folder 01 (Create trip). 'Card' falls back here and requires a PaymentToken.",
+                  "    paymentIdempotencyKey: cv('pf_domain_key'),",
+                  "    mockTokenAlias: cv('ride_completed_token_alias') || cv('pf_token_alias'), // PaymentToken must be non-empty (any payment method)",
+                  "    occurredAtUtc: new Date().toISOString(),",
+                  "    correlationId: guid(),",
+                  "    causationId: guid()",
+                  "  },",
+                  "  sentTime: new Date().toISOString(),",
+                  "  headers: {}",
+                  "};",
+                  "pm.collectionVariables.set('pf_publish_body', JSON.stringify({",
+                  "  properties: { delivery_mode: 2, content_type: 'application/vnd.masstransit+json', message_id: envelope.messageId },",
+                  "  routing_key: cv('rabbit_routing_key') || '',",
+                  "  payload: JSON.stringify(envelope),",
+                  "  payload_encoding: 'string'",
+                  "}));",
+                  "// ===== [ADDED] PaymentFailedV1 test - END ====="
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] PaymentFailedV1 test (RideCompletedConsumer -> idempotency_conflict / domain_error) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.eql(200);",
+                  "pm.expect(pm.response.json().routed, 'not routed: check rabbit_exchange / bindings').to.eql(true);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] PaymentFailedV1 test - END ====="
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": " 02-7 Wait PaymentFailedV1 domain_error",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/queues/{{rabbit_vhost}}/{{pf_tap_queue}}/get",
+            "description": "[ADDED] Polls the tap queue for the domain_error event of the invalid-amount trip.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"count\":50,\"ackmode\":\"ack_requeue_true\",\"encoding\":\"auto\",\"truncate\":50000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] PaymentFailedV1 test (RideCompletedConsumer -> idempotency_conflict / domain_error) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "const pick = (o, k) => { const key = Object.keys(o || {}).find(x => x.toLowerCase() === k.toLowerCase()); return key === undefined ? undefined : o[key]; };",
+                  "const low = (v) => String(v === undefined || v === null ? '' : v).toLowerCase();",
+                  "pm.expect(pm.response.code).to.eql(200);",
+                  "const tripId = low(pm.collectionVariables.get('pf_domain_trip_id'));",
+                  "const found = pm.response.json()",
+                  "  .map(m => { try { return JSON.parse(m.payload); } catch (e) { return null; } })",
+                  "  .filter(Boolean)",
+                  "  .map(env => env.message || env)",
+                  "  .find(m => low(pick(m, 'tripId')) === tripId && pick(m, 'failureCode') === 'domain_error');",
+                  "if (!found) {",
+                  "  const count = Number(pm.collectionVariables.get('pf_polls') || 0) + 1;",
+                  "  pm.collectionVariables.set('pf_polls', count);",
+                  "  pm.expect(count, 'PaymentFailedV1 (domain_error) not seen on tap queue: check PaymentService logs / exchange binding').to.be.below(15);",
+                  "  pm.execution.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "  pm.collectionVariables.set('pf_polls', 0);",
+                  "  pm.expect(pick(found, 'isPermanent')).to.eql(true);",
+                  "  pm.expect(low(pick(found, 'paymentKey'))).to.eql(low(pm.collectionVariables.get('pf_domain_key')));",
+                  "  pm.expect(pick(found, 'safeErrorMessage')).to.be.a('string').and.not.empty;",
+                  "  pm.expect(pick(found, 'paymentId') === null || pick(found, 'paymentId') === undefined).to.eql(true);",
+                  "  const allowed = [\"pf_domain_event_id\"].map(k => low(pm.collectionVariables.get(k)));",
+                  "  pm.expect(allowed, 'CausationId must be the EventId of the RideCompletedV1 that failed').to.include(low(pick(found, 'causationId')));",
+                  "}",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] PaymentFailedV1 test - END ====="
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": " 02-8 Delete tap queue",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/queues/{{rabbit_vhost}}/{{pf_tap_queue}}",
+            "description": "[ADDED] Cleanup."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] PaymentFailedV1 test (RideCompletedConsumer -> idempotency_conflict / domain_error) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.eql(204);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] PaymentFailedV1 test - END ====="
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [
@@ -1585,6 +2211,76 @@
     {
       "key": "ride_completed_token_alias",
       "value": ""
+    },
+    {
+      "key": "pf_tap_queue",
+      "value": "postman-payment-failed-test",
+      "description": "PaymentFailedV1 test"
+    },
+    {
+      "key": "rabbit_payment_failed_exchange",
+      "value": "SwiftRide.Contracts.V1:PaymentFailedV1",
+      "description": "PaymentFailedV1 test"
+    },
+    {
+      "key": "pf_domain_amount",
+      "value": "-1000",
+      "description": "PaymentFailedV1 test"
+    },
+    {
+      "key": "pf_trip_id",
+      "value": "",
+      "description": "PaymentFailedV1 test"
+    },
+    {
+      "key": "pf_payment_key",
+      "value": "",
+      "description": "PaymentFailedV1 test"
+    },
+    {
+      "key": "pf_seed_event_id",
+      "value": "",
+      "description": "PaymentFailedV1 test"
+    },
+    {
+      "key": "pf_conflict_event_id",
+      "value": "",
+      "description": "PaymentFailedV1 test"
+    },
+    {
+      "key": "pf_domain_trip_id",
+      "value": "",
+      "description": "PaymentFailedV1 test"
+    },
+    {
+      "key": "pf_domain_key",
+      "value": "",
+      "description": "PaymentFailedV1 test"
+    },
+    {
+      "key": "pf_domain_event_id",
+      "value": "",
+      "description": "PaymentFailedV1 test"
+    },
+    {
+      "key": "pf_polls",
+      "value": "",
+      "description": "PaymentFailedV1 test"
+    },
+    {
+      "key": "pf_publish_body",
+      "value": "",
+      "description": "PaymentFailedV1 test"
+    },
+    {
+      "key": "pf_payment_method",
+      "value": "wallet",
+      "description": "[ADDED] PaymentFailedV1 test: paymentMethod sent in RideCompletedV1 (folder 01 uses wallet)"
+    },
+    {
+      "key": "pf_token_alias",
+      "value": "tok_postman_pf",
+      "description": "PaymentFailedV1 test: mock token"
     }
   ]
 }
