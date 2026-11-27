@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "36638f56-063d-4f31-bb4c-ccd0185aa824",
-    "name": "RabbitMQ Crashed + PaymentFailed",
+    "name": "RabbitMQ Crashed + PaymentFailed + Concurrent",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1180,269 +1180,6 @@
               }
             }
           ]
-        },
-        {
-          "name": "02 Duplicate RideCompleted message",
-          "description": "Development-only at-least-once delivery test. Run 02 Create settlement observer first to initialize collectionVariables; then send each request individually or run the folder. Requires a running PaymentService and RabbitMQ Management credentials in the selected local Postman environment.",
-          "auth": {
-            "type": "basic",
-            "basic": [
-              {
-                "key": "username",
-                "value": "{{rabbitmq_user}}",
-                "type": "string"
-              },
-              {
-                "key": "password",
-                "value": "{{rabbitmq_password}}",
-                "type": "string"
-              }
-            ]
-          },
-          "item": [
-            {
-              "name": "02 Create settlement observer",
-              "request": {
-                "method": "PUT",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": "{{rabbitmq_url}}/api/queues/%2F/{{duplicate_observer_queue}}",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"durable\": false,\n  \"auto_delete\": false,\n  \"arguments\": {\n    \"x-expires\": 3600000,\n    \"x-message-ttl\": 3600000\n  }\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "event": [
-                {
-                  "listen": "prerequest",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "if (!pm.variables.get('rabbitmq_user') || !pm.variables.get('rabbitmq_password')) throw new Error('Set rabbitmq_user and rabbitmq_password in a local Postman environment.');",
-                      "const run = pm.variables.replaceIn('{{$guid}}');",
-                      "pm.collectionVariables.set('duplicate_run_id', run);",
-                      "pm.collectionVariables.set('duplicate_observer_queue', 'demo-duplicate-' + run);",
-                      "pm.collectionVariables.set('duplicate_event_id', pm.variables.replaceIn('{{$guid}}'));",
-                      "pm.collectionVariables.set('duplicate_trip_id', pm.variables.replaceIn('{{$guid}}'));",
-                      "pm.collectionVariables.set('duplicate_quote_id', pm.variables.replaceIn('{{$guid}}'));",
-                      "pm.collectionVariables.set('duplicate_occurred_at', new Date().toISOString());",
-                      "pm.collectionVariables.set('duplicate_publish_attempt', 0);",
-                      "pm.collectionVariables.set('duplicate_poll_count', 0);"
-                    ]
-                  }
-                },
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test(pm.info.requestName, function () {",
-                      "  try {",
-                      "pm.expect(pm.response.code).to.be.oneOf([201, 204]);",
-                      "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
-                      "});"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "02 Bind settlement observer",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": "{{rabbitmq_url}}/api/bindings/%2F/e/SwiftRide.Contracts.V1%3APaymentSettledV1/q/{{duplicate_observer_queue}}",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"routing_key\": \"\",\n  \"arguments\": {}\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test(pm.info.requestName, function () {",
-                      "  try {",
-                      "pm.expect(pm.response.code).to.be.oneOf([201, 204]);",
-                      "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
-                      "});"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "02 Publish RideCompleted twice",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": "{{rabbitmq_url}}/api/exchanges/%2F/SwiftRide.Contracts.V1%3ARideCompletedV1/publish",
-                "description": "Collection Runner repeats this request once automatically. When sending requests individually, click Send twice; collectionVariables keep the EventId and payload unchanged.",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "event": [
-                {
-                  "listen": "prerequest",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "const message = { eventId: pm.collectionVariables.get('duplicate_event_id'), tripId: pm.collectionVariables.get('duplicate_trip_id'), riderId: 'pm-duplicate-rider-' + pm.collectionVariables.get('duplicate_run_id'), driverId: 'pm-duplicate-driver-' + pm.collectionVariables.get('duplicate_run_id'), quoteId: pm.collectionVariables.get('duplicate_quote_id'), fareAmount: 85000, fareCurrency: 'VND', paymentMethod: 'Card', mockTokenAlias: 'tok_card_ok', paymentIdempotencyKey: 'trip-' + pm.collectionVariables.get('duplicate_trip_id') + '-payment', occurredAtUtc: pm.collectionVariables.get('duplicate_occurred_at'), correlationId: 'pm-duplicate-' + pm.collectionVariables.get('duplicate_run_id'), causationId: null };",
-                      "pm.request.body.update({ mode: 'raw', raw: JSON.stringify({ properties: { delivery_mode: 2, content_type: 'application/vnd.masstransit+json', message_id: message.eventId }, routing_key: '', payload: JSON.stringify({ messageId: message.eventId, messageType: ['urn:message:SwiftRide.Contracts.V1:RideCompletedV1'], message }), payload_encoding: 'string' }) });"
-                    ]
-                  }
-                },
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test(pm.info.requestName, function () {",
-                      "  try {",
-                      "pm.expect(pm.response.code).to.eql(200);",
-                      "pm.expect(pm.response.json().routed).to.eql(true);",
-                      "const attempt = Number(pm.collectionVariables.get('duplicate_publish_attempt') || 0) + 1;",
-                      "pm.collectionVariables.set('duplicate_publish_attempt', attempt);",
-                      "if (attempt === 1) pm.execution.setNextRequest(pm.info.requestName);",
-                      "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
-                      "});"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "02 Wait for settlement",
-              "request": {
-                "method": "GET",
-                "header": [],
-                "url": "{{rabbitmq_url}}/api/queues/%2F/{{duplicate_observer_queue}}",
-                "description": "Collection Runner retries at most 30 times; use a 1000 ms delay. For an individual Send, repeat while messages_ready is 0.",
-                "event": [
-                  {
-                    "listen": "test",
-                    "script": {
-                      "type": "text/javascript",
-                      "exec": [
-                        "pm.test(pm.info.requestName, function () {",
-                        "  try {",
-                        "pm.expect(pm.response.code).to.eql(200);",
-                        "const ready = Number(pm.response.json().messages_ready || 0);",
-                        "if (ready < 1) {",
-                        "  const attempts = Number(pm.collectionVariables.get('duplicate_poll_count') || 0) + 1;",
-                        "  pm.collectionVariables.set('duplicate_poll_count', attempts);",
-                        "  pm.expect(attempts, 'settlement polling limit exceeded').to.be.below(30);",
-                        "  pm.execution.setNextRequest(pm.info.requestName);",
-                        "}",
-                        "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
-                        "});"
-                      ]
-                    }
-                  }
-                ]
-              }
-            },
-            {
-              "name": "02 Verify one PaymentSettled",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": "{{rabbitmq_url}}/api/queues/%2F/{{duplicate_observer_queue}}/get",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"count\": 100,\n  \"ackmode\": \"ack_requeue_true\",\n  \"encoding\": \"auto\",\n  \"truncate\": 100000\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "pm.test(pm.info.requestName, function () {",
-                      "  try {",
-                      "pm.expect(pm.response.code).to.eql(200);",
-                      "const messages = pm.response.json();",
-                      "const settlements = messages.filter(entry => {",
-                      "  let envelope;",
-                      "  try { envelope = typeof entry.payload === 'string' ? JSON.parse(entry.payload) : entry.payload; } catch (_) { return false; }",
-                      "  return envelope && envelope.message && envelope.message.tripId === pm.collectionVariables.get('duplicate_trip_id');",
-                      "});",
-                      "pm.expect(settlements, 'one settlement event for this duplicate trip').to.have.lengthOf(1);",
-                      "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
-                      "});"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "02 Delete settlement observer",
-              "request": {
-                "method": "DELETE",
-                "header": [],
-                "url": "{{rabbitmq_url}}/api/queues/%2F/{{duplicate_observer_queue}}",
-                "event": [
-                  {
-                    "listen": "test",
-                    "script": {
-                      "type": "text/javascript",
-                      "exec": [
-                        "pm.test(pm.info.requestName, function () {",
-                        "  try {",
-                        "pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
-                        "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
-                        "});"
-                      ]
-                    }
-                  }
-                ]
-              }
-            }
-          ]
         }
       ]
     },
@@ -2071,6 +1808,425 @@
           ]
         }
       ]
+    },
+    {
+      "name": " 03 DbUpdateConcurrencyException: concurrent RideCompletedV1",
+      "description": "[ADDED] Run this entire folder in order (delay 1000 ms). Talks only to the RabbitMQ Management API. The race is probabilistic: increase pf_cc_burst or rerun if the PaymentService log shows no \"[TRANSIENT] Concurrency conflict\".",
+      "item": [
+        {
+          "name": " 03-1 Create concurrency tap queue",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/queues/{{rabbit_vhost}}/{{pf_cc_tap_queue}}",
+            "description": "[ADDED] Temporary queue (expires after 10 minutes) collecting PaymentSettledV1 and PaymentFailedV1 of the burst.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"durable\":false,\"auto_delete\":false,\"arguments\":{\"x-expires\":600000}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] DbUpdateConcurrencyException test (concurrent RideCompletedV1, same trip/PaymentKey) - BEGIN =====",
+                  "const guid = () => pm.variables.replaceIn('{{$guid}}');",
+                  "const set = (k, v) => pm.collectionVariables.set(k, v);",
+                  "set('pf_cc_polls', 0);",
+                  "set('pf_cc_trip_id', guid());",
+                  "set('pf_cc_key', 'trip-' + pm.collectionVariables.get('pf_cc_trip_id') + '-payment');",
+                  "set('pf_cc_quote_id', guid());",
+                  "set('pf_cc_rider_id', guid());",
+                  "set('pf_cc_driver_id', guid());",
+                  "set('pf_cc_correlation_id', guid());",
+                  "set('pf_cc_event_ids', '[]');",
+                  "set('pf_cc_publish_results', '[]');",
+                  "// ===== [ADDED] DbUpdateConcurrencyException test - END ====="
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] DbUpdateConcurrencyException test (concurrent RideCompletedV1, same trip/PaymentKey) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect([201, 204]).to.include(pm.response.code);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] DbUpdateConcurrencyException test - END ====="
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": " 03-2 Bind tap queue to PaymentSettledV1 exchange",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/bindings/{{rabbit_vhost}}/e/{{rabbit_payment_settled_exchange}}/q/{{pf_cc_tap_queue}}",
+            "description": "[ADDED] 404 = exchange name wrong / not created yet.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"routing_key\":\"\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] DbUpdateConcurrencyException test (concurrent RideCompletedV1, same trip/PaymentKey) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code, 'exchange rabbit_payment_settled_exchange not found').to.be.oneOf([201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] DbUpdateConcurrencyException test - END ====="
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": " 03-3 Bind tap queue to PaymentFailedV1 exchange",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/bindings/{{rabbit_vhost}}/e/{{rabbit_payment_failed_exchange}}/q/{{pf_cc_tap_queue}}",
+            "description": "[ADDED] 404 = exchange name wrong / not created yet.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"routing_key\":\"\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] DbUpdateConcurrencyException test (concurrent RideCompletedV1, same trip/PaymentKey) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code, 'exchange rabbit_payment_failed_exchange not found').to.be.oneOf([201, 204]);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] DbUpdateConcurrencyException test - END ====="
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": " 03-4 Burst publish N concurrent RideCompletedV1 (same trip and PaymentKey)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/overview",
+            "description": "[ADDED] Carrier request: the pre-request fires pf_cc_burst (default 10) publishes in parallel with pm.sendRequest. Expected PaymentService log: [TRANSIENT] Concurrency conflict processing payment for trip ... followed by a successful retry."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] DbUpdateConcurrencyException test (concurrent RideCompletedV1, same trip/PaymentKey) - BEGIN =====",
+                  "// Fire N RideCompletedV1 at the same time: different EventId (so the inbox does not de-duplicate),",
+                  "// same trip / PaymentKey / parameters (so no IdempotencyConflict). The consumers race on the same Payment row.",
+                  "const guid = () => pm.variables.replaceIn('{{$guid}}');",
+                  "const cv = (k) => pm.collectionVariables.get(k);",
+                  "const n = Math.max(2, Number(cv('pf_cc_burst') || 10));",
+                  "const url = pm.variables.replaceIn('{{rabbit_mgmt_url}}/api/exchanges/{{rabbit_vhost}}/{{rabbit_exchange}}/publish');",
+                  "const ids = [];",
+                  "const results = [];",
+                  "pm.collectionVariables.set('pf_cc_publish_results', '[]');",
+                  "for (let i = 0; i < n; i++) {",
+                  "  const eventId = guid();",
+                  "  ids.push(eventId);",
+                  "  const envelope = {",
+                  "    messageId: guid(),",
+                  "    conversationId: guid(),",
+                  "    sourceAddress: 'rabbitmq://localhost/postman-demo',",
+                  "    messageType: [cv('masstransit_message_type')],",
+                  "    message: {",
+                  "      eventId: eventId,",
+                  "      tripId: cv('pf_cc_trip_id'),",
+                  "      quoteId: cv('pf_cc_quote_id'),",
+                  "      riderId: cv('pf_cc_rider_id'),",
+                  "      driverId: cv('pf_cc_driver_id'),",
+                  "      fareAmount: 50000,",
+                  "      fareCurrency: 'VND',",
+                  "      paymentMethod: cv('pf_payment_method') || 'wallet',",
+                  "      paymentIdempotencyKey: cv('pf_cc_key'),",
+                  "      mockTokenAlias: cv('pf_token_alias'),",
+                  "      occurredAtUtc: new Date().toISOString(),",
+                  "      correlationId: cv('pf_cc_correlation_id'),",
+                  "      causationId: guid()",
+                  "    },",
+                  "    sentTime: new Date().toISOString(),",
+                  "    headers: {}",
+                  "  };",
+                  "  pm.sendRequest({",
+                  "    url: url,",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json' },",
+                  "    auth: { type: 'basic', basic: [{ key: 'username', value: cv('rabbit_user') }, { key: 'password', value: cv('rabbit_pass') }] },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({",
+                  "      properties: { delivery_mode: 2, content_type: 'application/vnd.masstransit+json', message_id: envelope.messageId },",
+                  "      routing_key: cv('rabbit_routing_key') || '',",
+                  "      payload: JSON.stringify(envelope),",
+                  "      payload_encoding: 'string'",
+                  "    }) }",
+                  "  }, (err, res) => {",
+                  "    let routed = false;",
+                  "    try { routed = !err && res.code === 200 && res.json().routed === true; } catch (e) { routed = false; }",
+                  "    results.push({ ok: routed, code: res ? res.code : null });",
+                  "    pm.collectionVariables.set('pf_cc_publish_results', JSON.stringify(results));",
+                  "  });",
+                  "}",
+                  "pm.collectionVariables.set('pf_cc_event_ids', JSON.stringify(ids));",
+                  "// ===== [ADDED] DbUpdateConcurrencyException test - END ====="
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] DbUpdateConcurrencyException test (concurrent RideCompletedV1, same trip/PaymentKey) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "const results = JSON.parse(pm.collectionVariables.get('pf_cc_publish_results') || '[]');",
+                  "const expected = JSON.parse(pm.collectionVariables.get('pf_cc_event_ids') || '[]').length;",
+                  "pm.expect(results.length, 'not all publishes completed').to.eql(expected);",
+                  "pm.expect(results.filter(r => !r.ok), 'some publishes failed or were not routed').to.be.empty;",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] DbUpdateConcurrencyException test - END ====="
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": " 03-5 Wait every concurrent RideCompletedV1 reaches an outcome event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/queues/{{rabbit_vhost}}/{{pf_cc_tap_queue}}/get",
+            "description": "[ADDED] Polls the tap queue until PaymentSettledV1/PaymentFailedV1 exists for every EventId of the burst (CausationId = RideCompletedV1.EventId). Proves the concurrency exception was retried, not lost.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"count\":100,\"ackmode\":\"ack_requeue_true\",\"encoding\":\"auto\",\"truncate\":50000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] DbUpdateConcurrencyException test (concurrent RideCompletedV1, same trip/PaymentKey) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "const pick = (o, k) => { const key = Object.keys(o || {}).find(x => x.toLowerCase() === k.toLowerCase()); return key === undefined ? undefined : o[key]; };",
+                  "const low = (v) => String(v === undefined || v === null ? '' : v).toLowerCase();",
+                  "pm.expect(pm.response.code).to.eql(200);",
+                  "const ids = JSON.parse(pm.collectionVariables.get('pf_cc_event_ids') || '[]').map(low);",
+                  "const tripId = low(pm.collectionVariables.get('pf_cc_trip_id'));",
+                  "const events = pm.response.json()",
+                  "  .map(m => { try { return JSON.parse(m.payload); } catch (e) { return null; } })",
+                  "  .filter(Boolean)",
+                  "  .map(env => env.message || env)",
+                  "  .filter(m => low(pick(m, 'tripId')) === tripId);",
+                  "const causes = new Set(events.map(m => low(pick(m, 'causationId'))));",
+                  "const missing = ids.filter(id => !causes.has(id));",
+                  "if (missing.length > 0) {",
+                  "  const count = Number(pm.collectionVariables.get('pf_cc_polls') || 0) + 1;",
+                  "  pm.collectionVariables.set('pf_cc_polls', count);",
+                  "  pm.expect(count, missing.length + ' of ' + ids.length + ' RideCompletedV1 produced no PaymentSettledV1/PaymentFailedV1 (still retrying, or moved to *_error). See PaymentService logs.').to.be.below(30);",
+                  "  pm.execution.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "  pm.collectionVariables.set('pf_cc_polls', 0);",
+                  "  const paymentIds = new Set(events.map(m => pick(m, 'paymentId')).filter(Boolean).map(low));",
+                  "  pm.expect(paymentIds.size, 'all messages must resolve to ONE payment').to.be.at.most(1);",
+                  "  pm.expect(events.filter(m => pick(m, 'failureCode') === 'idempotency_conflict'), 'parameters are identical, no idempotency_conflict expected').to.be.empty;",
+                  "  console.log('Concurrent burst resolved: ' + ids.length + ' messages, ' + events.length + ' outcome events. Look for \"[TRANSIENT] Concurrency conflict\" in PaymentService logs.');",
+                  "}",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] DbUpdateConcurrencyException test - END ====="
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": " 03-6 Delete concurrency tap queue",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbit_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbit_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{rabbit_mgmt_url}}/api/queues/{{rabbit_vhost}}/{{pf_cc_tap_queue}}",
+            "description": "[ADDED] Cleanup."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ===== [ADDED] DbUpdateConcurrencyException test (concurrent RideCompletedV1, same trip/PaymentKey) - BEGIN =====",
+                  "pm.test(pm.info.requestName, function () {",
+                  "  try {",
+                  "pm.expect(pm.response.code).to.eql(204);",
+                  "  } catch (error) { pm.execution.setNextRequest(null); throw error; }",
+                  "});",
+                  "// ===== [ADDED] DbUpdateConcurrencyException test - END ====="
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [
@@ -2212,6 +2368,7 @@
       "key": "ride_completed_token_alias",
       "value": ""
     },
+
     {
       "key": "pf_tap_queue",
       "value": "postman-payment-failed-test",
@@ -2281,6 +2438,67 @@
       "key": "pf_token_alias",
       "value": "tok_postman_pf",
       "description": "PaymentFailedV1 test: mock token"
+    },
+
+    {
+      "key": "pf_cc_tap_queue",
+      "value": "postman-concurrency-tap",
+      "description": "[ADDED] DbUpdateConcurrencyException test"
+    },
+    {
+      "key": "rabbit_payment_settled_exchange",
+      "value": "SwiftRide.Contracts.V1:PaymentSettledV1",
+      "description": "[ADDED] DbUpdateConcurrencyException test"
+    },
+    {
+      "key": "pf_cc_burst",
+      "value": "3",
+      "description": "[ADDED] DbUpdateConcurrencyException test"
+    },
+    {
+      "key": "pf_cc_trip_id",
+      "value": "",
+      "description": "[ADDED] DbUpdateConcurrencyException test"
+    },
+    {
+      "key": "pf_cc_key",
+      "value": "",
+      "description": "[ADDED] DbUpdateConcurrencyException test"
+    },
+    {
+      "key": "pf_cc_quote_id",
+      "value": "",
+      "description": "[ADDED] DbUpdateConcurrencyException test"
+    },
+    {
+      "key": "pf_cc_rider_id",
+      "value": "",
+      "description": "[ADDED] DbUpdateConcurrencyException test"
+    },
+    {
+      "key": "pf_cc_driver_id",
+      "value": "",
+      "description": "[ADDED] DbUpdateConcurrencyException test"
+    },
+    {
+      "key": "pf_cc_correlation_id",
+      "value": "",
+      "description": "[ADDED] DbUpdateConcurrencyException test"
+    },
+    {
+      "key": "pf_cc_event_ids",
+      "value": "",
+      "description": "[ADDED] DbUpdateConcurrencyException test"
+    },
+    {
+      "key": "pf_cc_publish_results",
+      "value": "",
+      "description": "[ADDED] DbUpdateConcurrencyException test"
+    },
+    {
+      "key": "pf_cc_polls",
+      "value": "",
+      "description": "[ADDED] DbUpdateConcurrencyException test"
     }
   ]
 }
