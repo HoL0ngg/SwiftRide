@@ -19,7 +19,7 @@ component bên trong, gọi nó rồi áp dụng một phép tính:
 | `PromotionDecorator` | Giá bên trong × promotionFactor |
 | `TaxDecorator` | Giá bên trong × (1 + tax) |
 
-Các lớp nằm trong `src/MatchingService/Domain/FareComponents.cs`.
+Các lớp nằm trong `src/MatchingService/Domain/Pricing/`.
 `FareCalculator` ghép chuỗi bằng cách bọc lần lượt:
 
 ```csharp
